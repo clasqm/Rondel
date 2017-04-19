@@ -1,0 +1,68 @@
+#!env yab
+//NOTE: This program is built on the Trope text editor and requires the latest Trope 
+// subroutines (i.e. the entire contents of the Trope /sub directory) to be copied
+//or symlinked into its own /sub directory 
+
+//Rondel v0.8.4.2
+//Versioning: the first set of numbers refer to the major version of Trope on which this program is built.
+//The second number refers to Rondel-specific changes
+//The third number refers to updates of the included Markdown utility
+//By Michel Clasquin-Johnson
+//Public Domain software 2014
+
+// set DEBUG = 1 to print out all messages on the console
+DEBUG = 1
+
+///////////////////INITIAL SETTING UP STUFF/////////////////
+
+//Create directories and files if they do not yet exist
+system("mkdir -p /boot/home/config/settings/Rondel")
+system("touch /boot/home/config/settings/Rondel/Rondel.settings")
+system("touch /boot/home/config/settings/Rondel/Rondel.recent")
+
+//Global Variables - declared here just for reference
+ xorigin = 0
+ yorigin = 0
+ xwidth = 0
+ yheight = 0
+SearchText$=""
+ReplaceText$ = ""
+CurrentFile$ = ""
+DroppedFile$ = ""
+WordWrap = 0
+Backup = 0
+Toolbar = 1
+FileIsOpen = 0
+tempval$ = ""
+tempval = 0
+Snippet$ = ""
+dim RecentFile$(10)
+dim msg$(1)
+Language$ = ""
+autocomplete=0
+
+//But these are for real
+AppName$ = "Rondel"
+//change executable filename manually after binding
+AppVersion$ = "v0.8.4.2"
+SettingsDir$ = "/boot/home/config/settings/Rondel/"
+SettingsFile$ = "/boot/home/config/settings/Rondel/Rondel.settings"
+RecentFile$ = "/boot/home/config/settings/Rondel/Rondel.recent"
+
+OpenWindow()
+  
+//open file specified on the command line or passed along by the OS
+if peek("argument") <> 0 then
+	CurrentFile$ = (peek$("argument"))
+	OpenFile(CurrentFile$)
+	FileIsOpen=1
+	RegenerateRecent()
+elseif peek$("refsreceived") <> "" then
+	CurrentFile$ = (peek$("refsreceived"))
+	OpenFile(CurrentFile$)
+	FileIsOpen=1
+	RegenerateRecent()
+else
+	MakeDocHeaderBox()
+end if
+

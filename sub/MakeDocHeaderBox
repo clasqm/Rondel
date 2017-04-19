@@ -1,0 +1,25 @@
+sub MakeDocHeaderBox()
+######Rondel-specific subroutine#####
+	local CenterX, CenterY, tempval$, currentsel$, todaysdate$
+	if (window get "EntryWindow", "exists" = 1) or (window get "GraphicWindow", "exists" = 1) or (window get "DocHeaderWindow", "exists" = 1)return // no more than 1 entry widow onscreen at a time
+	currentsel$= textedit get$ "EditBox", "Selection"
+	CenterX = INT((Window Get "MainWindow", "Width")/2) + (Window Get "MainWindow","Position-X")
+	CenterY =INT((Window Get "MainWindow", "Height")/2) + (Window Get "MainWindow","Position-Y")
+	Window Open CenterX - 100, CenterY - 100 to CenterX + 100, CenterY + 100, "DocHeaderWindow" , ""
+	Window Set "DocHeaderWindow", "Look", "Modal"
+	Window Set"DocHeaderWindow", "Feel", "Floating-App"
+	Window Set "DocHeaderWindow", "Flags", "Not-Resizable"
+	text 5,5 to 195,25, "DocHeaderWindowLabel","Document Headers", "DocHeaderWindow"
+	text set "DocHeaderWindowLabel","align-center"
+	text 5,25 to 195,30, "DocHeaderWindowUnderline","- - - - - - - - - - - - - - - - -", "DocHeaderWindow"
+	text set "DocHeaderWindowUnderline","align-center"
+	textcontrol 5, 40 to 195,60, "DocHeaderField1", "Title:", "%", "DocHeaderWindow" 
+	textcontrol 5, 70 to 195,90, "DocHeaderField2", "Author", "%", "DocHeaderWindow"
+	todaysdate$ = right$(date$, 3) + " " + mid$(date$, 6,2) + ", " +mid$(date$, 9,4) 
+	textcontrol 5, 100 to 195,120, "DocHeaderField3", "Date:", "%" + todaysdate$, "DocHeaderWindow"
+	text 5,130, "DocHeaderMoreInfo", "If the 1st 3 lines begin with %,", "DocHeaderWindow"
+	text 5,150, "DocHeaderMoreInfo2", "they are taken as a header.", "DocHeaderWindow"
+	button 5,170 to 95,195, "DocHeaderAcceptButton", "Accept", "DocHeaderWindow"
+	button 105,170 to 195,195, "DocHeaderCancelButton", "Cancel", "DocHeaderWindow"
+end sub
+

@@ -1,0 +1,15 @@
+sub MakeDocHeader()
+######Rondel-specific subroutine#####
+	local tempval$, doctitle$, authorname$, creationdate$, wherewasi
+	doctitle$ = textcontrol get$ "DocHeaderField1"
+	authorname$ = textcontrol get$ "DocHeaderField2"
+	creationdate$ = textcontrol get$ "DocHeaderField3"
+	if left$(doctitle$,1) <> "%" and doctitle$ <>"" doctitle$ = "%" + doctitle$ // just in case the user deleted the %
+	if left$ (authorname$, 1) <> "%" and authorname$ <>""  authorname$ = "%" + authorname$
+	if left$(creationdate$, 1) <> "%" and creationdate$ <>""  creationdate$ = "%" + creationdate$
+	wherewasi = textedit get "EditBox", "currentline"
+	textedit set "EditBox", "gotoline", 1
+	textedit add "EditBox", doctitle$ + "\n" + authorname$ + "\n" + creationdate$ + "\n"
+	textedit set "EditBox", "gotoline", wherewasi + 3
+end sub
+

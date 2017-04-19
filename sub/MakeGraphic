@@ -1,0 +1,26 @@
+sub MakeGraphic()
+######Rondel-specific subroutine#####
+	local tempval$, graphname$, tooltip$, alttext$,resize$
+	graphname$ = textcontrol get$ "GraphicField1"
+	tooltip$ = textcontrol get$ "GraphicField2"
+	alttext$ = textcontrol get$ "GraphicField3"
+	resize$ = textcontrol get$ "GraphicField4"
+	if graphname$ = ""  then
+		alert "A compulsory field was not filled in.\n Please try again", "OK", "info"
+		return
+	end if
+	if tooltip$ = "" tooltip$= ParsePath2Filename$(graphname$)
+	if alttext$ = "" alttext$= ParsePath2Filename$(graphname$)
+	if resize$ <> "" tooltip$= ""
+	if resize$ <> "" and left$(resize$,1) <> "=" resize$ = "=" + resize$
+	tempval$ = "\n![" + alttext$ + "](" + graphname$ 
+	if tooltip$ <> "" then
+		tempval$ = tempval$ + " \"" + tooltip$ + "\")\n"
+	elseif resize$ <> "" 
+		tempval$ = tempval$ + " " + resize$ + ")\n"
+	else 
+		tempval$ = tempval$ + ")\n"
+	end if
+	textedit add "EditBox", tempval$
+end sub
+

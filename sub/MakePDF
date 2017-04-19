@@ -1,0 +1,32 @@
+sub MakePDF(target$)
+######Rondel-specific subroutine#####
+///Not ready for release
+///The problem is in htmldoc, not here
+///it generates files, all right, but they are unreadable.
+	local TempfilePath$, tempfile$, dothis$, htmlname$, arrsize, a$(1)
+	TempfilePath$ = system$("finddir B_COMMON_TEMP_DIRECTORY") 
+	TempfilePath$ = left$(TempfilePath$, len(TempfilePath$)-1) //strip off trailing newline
+	tempfile$ = TempfilePath$ + "/temp_rondel.html"
+	arrsize = token(CurrentFile$,a$(), ".")
+	//normal name + 1 extension
+	if arrsize = 2 then
+		htmlname$ = a$(1) + ".html"
+	//name with no extension
+	elseif arrsize = 1 then
+		htmlname$ = CurrentFile$ + ".html"
+	//multiple extensions
+	else		
+		for f = 1 to arrsize-1
+			htmlname$ = htmlname$ + a$(f) + "."
+		next f
+		htmlname$ = htmlname$ + "html"
+	endif
+	//remove first line	- why is this necessary, again?
+	//htmldoc chokes on the <<doctype>> code
+	dothis$="sed '1d' " + htmlname$ + ">" + tempfile$
+	system(dothis$)
+	if target$ = "pdf"  dothis$ = "htmldoc --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
+	if target$ = "ps"  dothis$ = "htmldoc --webpage -f " + CurrentFile$ + ".ps " + tempfile$
+	system(dothis$)
+end sub
+

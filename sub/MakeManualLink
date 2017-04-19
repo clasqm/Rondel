@@ -1,0 +1,18 @@
+sub MakeManualLink()
+######Rondel-specific subroutine#####
+	local currentsel$, tempval$, linktext$, linkdata$, linktooltip$
+	currentsel$= textedit get$ "EditBox", "Selection"
+	linktext$ = textcontrol get$ "EntryField1"
+	linkdata$ = textcontrol get$ "EntryField2"
+	linktooltip$ = textcontrol get$ "EntryField3"
+	if linktext$ = "" or linkdata$ = "" then
+		alert "A compulsory field was not filled in.\n Please try again", "OK", "info"
+		return
+	end if
+	tempval$ = "[" + linktext$ + "](" + linkdata$
+	if linktooltip$ <> "" tempval$ = tempval$ + " \"" + linktooltip$ + "\""
+	tempval$ = tempval$ + ")"
+	if currentsel$ <> "" textedit set "EditBox", "clear"
+	textedit add "EditBox", tempval$
+end sub
+

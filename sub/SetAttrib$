@@ -1,0 +1,17 @@
+sub SetAttrib$(frontattrib$, rearattrib$)
+######Rondel-specific subroutine#####
+	local result$, currentsel$
+	currentsel$= textedit get$ "EditBox", "Selection"
+	if currentsel$ <> "" then
+		//strip off trailing newlines
+		while(right$(currentsel$,1) = "\n") 
+			currentsel$ = left$(currentsel$,len(currentsel$)-1)
+		wend
+		textedit set "EditBox", "clear"
+		result$ = frontattrib$ + currentsel$ + rearattrib$
+	else
+		result$ = frontattrib$ + "Enter Text Here" + rearattrib$
+	end if
+	return result$
+end sub
+

@@ -1,0 +1,13 @@
+sub HTML2text$(FileToOpen$)
+######Rondel-specific subroutine#####
+	local tempname$, tempval
+	tempname$ = FileToOpen$ + ".txt"
+		tempval = alert "You are trying to open a HTML file. Convert to Markdown?", "Yes", "No","", "warning"
+		if tempval = 1 then
+			system("html2text.py " + FileToOpen$ + " > " +  tempname$)
+			return tempname$
+		else
+			return FileToOpen$
+		end if
+end sub
+

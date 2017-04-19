@@ -1,0 +1,22 @@
+sub MakeRefLink()
+######Rondel-specific subroutine#####
+	local currentsel$, tempval$, linktext$, linkdata$, linktooltip$, currentline, maxline
+	currentsel$= textedit get$ "EditBox", "Selection"
+	linktext$ = textcontrol get$ "EntryField1"
+	linkdata$ = textcontrol get$ "EntryField2"
+	linktooltip$ = textcontrol get$ "EntryField3"
+	currentline = textedit get "EditBox", "currentline"
+	maxline = textedit get "EditBox", "countlines"
+	//first create the link
+	tempval$ = "[" + linktext$ + "][]"
+	if currentsel$ <> "" textedit set "EditBox", "clear"
+	textedit add "EditBox", tempval$
+	//and now the reference
+	if linkdata$ = "" or linkdata$ = "http://" return  //user decided that the reference had already been created
+	tempval$ = "[" + linktext$ + "]: " + linkdata$ 
+	if linktooltip$ <> "" tempval$ = tempval$ + " \"" + linktooltip$ + "\""
+	textedit set "EditBox", "gotoline", maxline
+	textedit add "EditBox", "\n" + tempval$ + "\n"
+	textedit set "EditBox", "gotoline", currentline
+end sub
+

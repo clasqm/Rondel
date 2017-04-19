@@ -1,0 +1,27 @@
+sub MakeGraphicBox()
+######Rondel-specific subroutine#####
+	local CenterX, CenterY, tempval$, currentsel$
+	if (window get "EntryWindow", "exists" = 1) or (window get "GraphicWindow", "exists" = 1) or (window get "DocHeaderWindow", "exists" = 1)return // no more than 1 entry widow onscreen at a time
+	currentsel$= textedit get$ "EditBox", "Selection"
+	CenterX = INT((Window Get "MainWindow", "Width")/2) + (Window Get "MainWindow","Position-X")
+	CenterY =INT((Window Get "MainWindow", "Height")/2) + (Window Get "MainWindow","Position-Y")
+	Window Open CenterX - 100, CenterY - 100 to CenterX + 100, CenterY + 100, "GraphicWindow" , ""
+	Window Set "GraphicWindow", "Look", "Modal"
+	Window Set"GraphicWindow", "Feel", "Floating-App"
+	Window Set "GraphicWindow", "Flags", "Not-Resizable"
+	text 5,5 to 195,25, "GraphicWindowLabel","Insert a Graphic", "GraphicWindow"
+	text set "GraphicWindowLabel","align-center"
+	text 5,25 to 195,30, "GraphicWindowUnderline","- - - - - - - - - - - - - - - - -", "GraphicWindow"
+	text set "GraphicWindowUnderline","align-center"
+	textcontrol 5, 40 to 195,60, "GraphicField1", "Filename:", "", "GraphicWindow"
+	tooltip "GraphicField1", "the full or relative path to the graphic to include.\nTry to avoid filenames with spaces."
+	textcontrol 5, 70 to 195,90, "GraphicField2", "Tooltip:", "", "GraphicWindow"
+	tooltip "GraphicField2", "The tooltip that will show up in the browser."
+	textcontrol 5, 100 to 195,120, "GraphicField3", "Alt Text:", "", "GraphicWindow"
+	tooltip "GraphicField3", "Alternate text for non-graphical browsers."
+	textcontrol 5, 130 to 195,150, "GraphicField4", "Dimensions:", "", "GraphicWindow"
+	tooltip "GraphicField4", "Optional resize dimensions in the format (width)x(height)e.g. 200x100.\nNote that entering a value here will invalidate the tooltip."
+	button 5,170 to 95,195, "GraphicAcceptButton", "Accept", "GraphicWindow"
+	button 105,170 to 195,195, "GraphicCancelButton", "Cancel", "GraphicWindow"
+end sub
+

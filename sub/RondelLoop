@@ -1,0 +1,155 @@
+sub RondelLoop(Command$)
+	Switch Command$
+		case "MenuView:File:Generate HTML"
+		case "MenuView:MarkDown:Generate HTML"
+			MakeHTML()
+			break
+		case "MenuView:File:Generate PDF"
+		case "MenuView:MarkDown:Generate PDF"
+			MakeHTML()
+			MakePDF("pdf")
+			break
+		case "MenuView:File:Generate Postscript"
+		case "MenuView:MarkDown:Generate Postscript"
+			MakeHTML()
+			MakePDF("ps")
+			break
+		///////Markdown:Attributes	
+		case "MenuView:MarkDown:Attributes:Bold"
+			textedit add "EditBox", SetAttrib$("**","**")
+			break
+		case "MenuView:MarkDown:Attributes:Bold Italic"
+			textedit add "EditBox", SetAttrib$("**_","_**")
+			break
+		case "MenuView:MarkDown:Attributes:Italic"
+			textedit add "EditBox", SetAttrib$("_","_")
+			break				
+		///////Markdown:headings
+		case "MenuView:MarkDown:Headings:Level 1":
+			textedit add "EditBox", SetAttrib$("#","")
+			break
+		case "MenuView:MarkDown:Headings:Level 2":
+			textedit add "EditBox", SetAttrib$("##","")
+			break
+		case "MenuView:MarkDown:Headings:Level 3":
+			textedit add "EditBox", SetAttrib$("###","")
+			break
+		case "MenuView:MarkDown:Headings:Level 4":
+			textedit add "EditBox", SetAttrib$("####","")
+			break
+		case "MenuView:MarkDown:Headings:Level 5":
+			textedit add "EditBox", SetAttrib$("#####","")
+			break
+		case "MenuView:MarkDown:Headings:Level 6":
+			textedit add "EditBox", SetAttrib$("######","")
+			break
+		///////Markdown:Link	
+		case "MenuView:MarkDown:Links:Automatic":
+			MakeEntryBox("LAuto", "Enter Automatic Link Details", "", "Link:", "", "", "")
+			break:
+		case "LAutoEntryAcceptButton":
+			MakeAutoLink()
+			Window close "EntryWindow"
+			break
+		case "MenuView:MarkDown:Links:Manual":
+			MakeEntryBox("LMan", "Enter Manual Link Details", "Text:", "Link:", "Tooltip:", "The tooltip is optional, and", "may be left blank.")
+			break
+		case "LManEntryAcceptButton":
+			MakeManualLink()
+			Window close "EntryWindow"
+			break
+		case "MenuView:MarkDown:Links:Reference":
+			MakeEntryBox("LRef", "Enter Reference Link Details", "Text:", "Link:", "Tooltip:", "Tooltip is optional.Link may be", "left blank if already created.")
+			break:
+		case "LRefEntryAcceptButton":
+			MakeRefLink()
+			Window close "EntryWindow"
+			break
+		case "EntryCancelButton":
+			Window close "EntryWindow"
+			break				
+		///////Markdown:Literals	
+		case "MenuView:MarkDown:Literals:\ backslash":
+			textedit add "EditBox", "\\\\"
+			break
+		case "MenuView:MarkDown:Literals:` backtick":
+			textedit add "EditBox", "\\\'"
+			break
+		case "MenuView:MarkDown:Literals:* asterisk":
+			textedit add "EditBox", "\\*"
+			break
+		case "MenuView:MarkDown:Literals:_ underscore":
+			textedit add "EditBox", "\\_"
+			break
+		case "MenuView:MarkDown:Literals:{} curly braces":
+			textedit add "EditBox", SetAttrib$("\{", "\}")
+			break
+		case "MenuView:MarkDown:Literals:[] square brackets":
+			textedit add "EditBox", SetAttrib$("\[", "\]")
+			break
+		case "MenuView:MarkDown:Literals:() parentheses":
+			textedit add "EditBox", SetAttrib$("\(", "\)")
+			break
+		case "MenuView:MarkDown:Literals:# hash mark":
+			textedit add "EditBox", "\\#"
+			break
+		case "MenuView:MarkDown:Literals:+ plus sign":
+			textedit add "EditBox", "\\+"
+			break
+		case "MenuView:MarkDown:Literals:- minus sign (hyphen)":
+			textedit add "EditBox", "\\-"
+			break
+		case "MenuView:MarkDown:Literals:. dot":
+			textedit add "EditBox", "\\."
+			break
+		case "MenuView:MarkDown:Literals:! exclamation mark":
+			textedit add "EditBox", "\\!"
+			break			
+		///////Markdown:Lists
+		case "MenuView:MarkDown:Lists:Alphabetical":
+			MakeLists("alpha")
+			break
+		case "MenuView:MarkDown:Lists:Bulleted":
+			MakeLists("bullet")
+			break	
+		case "MenuView:MarkDown:Lists:Numbered":
+			MakeLists("number")
+			break
+		///////Markdown:Other
+		case "MenuView:MarkDown:Other:BlockQuote"
+			MakeLists("block")
+			break
+		case "MenuView:MarkDown:Other:Center Text"
+			textedit add "EditBox", SetAttrib$("->","<-")
+			break
+		case "MenuView:MarkDown:Other:Code"
+			MakeLists("code")
+			break
+		case "MenuView:MarkDown:Other:Document Header"
+			MakeDocHeaderBox()
+			break
+		case "DocHeaderAcceptButton"
+			MakeDocHeader()
+			Window close "DocHeaderWindow"
+			break
+		case "DocHeaderCancelButton"
+			Window close "DocHeaderWindow"
+			break
+		case "MenuView:MarkDown:Other:Horizontal Rule":
+			textedit add "EditBox", "\n- - - - - - - - - - - - - - -\n"
+			break
+		case "MenuView:MarkDown:Other:Graphic"
+			MakeGraphicBox()
+			break
+		case "GraphicAcceptButton"
+			MakeGraphic()
+			Window close "GraphicWindow"
+			break
+		case "GraphicCancelButton"
+			Window close "GraphicWindow"
+			break
+		default
+			break
+	end switch
+end sub
+

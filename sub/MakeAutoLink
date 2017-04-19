@@ -1,0 +1,14 @@
+sub MakeAutoLink()
+######Rondel-specific subroutine#####
+	local currentsel$, tempval$, link$
+	currentsel$= textedit get$ "EditBox", "Selection"
+	link$ = textcontrol get$ "EntryField2"
+	if link$ = "" or link$ = "http://" then
+		alert "A compulsory field was not filled in.\n Please try again", "OK", "info"
+		return
+	end if
+	tempval$ = "<" + link$ + ">"
+	if currentsel$ <> "" textedit set "EditBox", "clear"
+	textedit add "EditBox", tempval$
+end sub
+

@@ -1,0 +1,27 @@
+sub MakeEntryBox(indicator$, headlabel$, label1$, label2$, label3$, moretext$, evenmoretext$)
+######Rondel-specific subroutine#####
+	local CenterX, CenterY, tempval$, currentsel$
+	if (window get "EntryWindow", "exists" = 1) or (window get "GraphicWindow", "exists" = 1) or (window get "DocHeaderWindow", "exists" = 1)return // no more than 1 entry widow onscreen at a time
+	currentsel$= textedit get$ "EditBox", "Selection"
+	CenterX = INT((Window Get "MainWindow", "Width")/2) + (Window Get "MainWindow","Position-X")
+	CenterY =INT((Window Get "MainWindow", "Height")/2) + (Window Get "MainWindow","Position-Y")
+	Window Open CenterX - 100, CenterY - 100 to CenterX + 100, CenterY + 100, "EntryWindow" , ""
+	Window Set "EntryWindow", "Look", "Modal"
+	Window Set"EntryWindow", "Feel", "Floating-App"
+	Window Set "EntryWindow", "Flags", "Not-Resizable"
+	text 5,5 to 195,25, "EntryWindowLabel",headlabel$, "EntryWindow"
+	text set "EntryWindowLabel","align-center"
+	for f = 1 to len(headlabel$)
+		tempval$= tempval$ + "- "
+	next f
+	text 5,25 to 195,30, "EntryWindowUnderline",tempval$, "EntryWindow"
+	text set "EntryWindowUnderline","align-center"
+	if label1$ <> ""textcontrol 5, 40 to 195,60, "EntryField1", label1$, currentsel$, "EntryWindow" //this one always contains selected text, if any
+	if label2$ <> "" textcontrol 5, 70 to 195,90, "EntryField2", label2$, "http://", "EntryWindow" //this one always starts a web address
+	if label3$ <> "" textcontrol 5, 100 to 195,120, "EntryField3", label3$, "", "EntryWindow"  //free-form
+	if moretext$ <> "" text 5,130, "EWMoreInfo", moretext$, "EntryWindow"
+	if evenmoretext$ <> "" text 5,150, "EWMoreInfo2", evenmoretext$, "EntryWindow"
+	button 5,170 to 95,195, indicator$ + "EntryAcceptButton", "Accept", "EntryWindow"
+	button 105,170 to 195,195, "EntryCancelButton", "Cancel", "EntryWindow"
+end sub
+

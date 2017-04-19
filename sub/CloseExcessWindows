@@ -1,0 +1,7 @@
+sub CloseExcessWindows()
+######Rondel-specific subroutine#####
+	if window get "DocHeaderWindow", "exists" = 1 window close "DocHeaderWindow"
+	if window get "EntryWindow", "exists" = 1 window close "EntryWindow"
+	if window get "GraphicWindow", "exists" = 1 window close "GraphicWindow"
+end sub
+

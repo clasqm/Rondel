@@ -1,0 +1,10 @@
+sub MakeHTML()
+######Rondel-specific subroutine#####
+	if CurrentFile$ = "" then 
+		alert "Nothing on disk to generate! Have you saved this file?", "OK", "warning"
+		return
+	end if
+	SaveFileFirst()
+	system("mkd2html '" + CurrentFile$ + "' &")
+end sub
+

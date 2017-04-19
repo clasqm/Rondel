@@ -1,0 +1,23 @@
+sub MakeTable$(across$, down$)
+######Rondel-specific subroutine#####
+	local across, down, result$, sepline$
+	across = val(across$): down = val(down$)
+	for f = 1 to down
+		for n = 1 to across
+			result$ = result$ + "c" +str$(n) + " r" + str$(f)
+			if f<down sepline$ = sepline$ + "--------"			
+			if n<across then
+				sepline$ = sepline$ + "|"
+				result$ = result$ + "|"
+			end if
+		next n
+		if f<down then 
+			result$ = result$ + "\n" + sepline$  + "\n"
+			sepline$ =""
+		else
+			result$ = result$ + "\n"
+		end if
+	next f
+	return result$
+end sub
+

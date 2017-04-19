@@ -1,0 +1,31 @@
+sub MakeLists(type$)
+######Rondel-specific subroutine#####
+	local currentsel$,a$(1), arraynum, prelist$, tempval$
+	currentsel$= textedit get$ "EditBox", "Selection"
+	if currentsel$ = "" then 
+		alert "Please select the lines you want to turn into a list, blockquote or code block first.", "OK", "info"
+		return
+	end if
+	arraynum = token(currentsel$, a$(), "\n")
+	if type$ = "alpha"and arraynum > 26 then
+		alert "Too many lines selected! There are only 26 letters in the alphabet.", "OK", "warning"
+		return
+	end if
+	if type$ = "block"and arraynum > 1 then
+		alert "Blockquote one paragraph at a time, please.", "OK", "warning"
+		return
+	end if
+	tempval$ = "\n"
+	for f = 1 to arraynum
+		if type$ = "block" prelist$ = "> "
+		if type$ = "code" prelist$ = "    "
+		if type$ = "bullet" prelist$ = "* "
+		if type$ = "number" prelist$ = str$(f) + ". "
+		if type$ = "alpha" prelist$ = chr$ (f + 96) + ". "
+		a$(f) = prelist$ + a$(f)
+		tempval$ = tempval$ + a$(f) + "\n"
+	next f
+	textedit set "EditBox", "clear"
+	textedit add "EditBox", tempval$
+end sub
+

@@ -3,10 +3,8 @@ sub MakePDF(target$)
 ///Not ready for release
 ///The problem is in htmldoc, not here
 ///it generates files, all right, but they are unreadable.
-	local TempfilePath$, tempfile$, dothis$, htmlname$, arrsize, a$(1)
-	TempfilePath$ = system$("finddir B_COMMON_TEMP_DIRECTORY") 
-	TempfilePath$ = left$(TempfilePath$, len(TempfilePath$)-1) //strip off trailing newline
-	tempfile$ = TempfilePath$ + "/temp_rondel.html"
+	local tempfile$, dothis$, htmlname$, arrsize, a$(1)
+	tempfile$ = TempDir()$ + "/temp_rondel.html"
 	arrsize = token(CurrentFile$,a$(), ".")
 	//normal name + 1 extension
 	if arrsize = 2 then

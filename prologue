@@ -13,6 +13,8 @@
 // set DEBUG = 1 to print out all messages on the console
 DEBUG = 1
 
+import libclasqm_main
+
 ///////////////////INITIAL SETTING UP STUFF/////////////////
 
 //Create directories and files if they do not yet exist
@@ -40,15 +42,16 @@ dim RecentFile$(10)
 dim msg$(1)
 Language$ = ""
 autocomplete=0
+PrintError=0
 
 //But these are for real
 AppName$ = "Rondel"
 //change executable filename manually after binding
-AppVersion$ = "v0.8.4.2"
+AppVersion$ = "v0.8.4.3"
 SettingsDir$ = "/boot/home/config/settings/Rondel/"
-SettingsFile$ = "/boot/home/config/settings/Rondel/Rondel.settings"
-RecentFile$ = "/boot/home/config/settings/Rondel/Rondel.recent"
-
+SettingsFile$ =  SettingsDir$ +"Rondel.settings"
+RecentFile$ = SettingsDir$ +"Rondel.recent"
+PrintSetupFile$= SettingsDir$ +"printsetup"
 OpenWindow()
   
 //open file specified on the command line or passed along by the OS

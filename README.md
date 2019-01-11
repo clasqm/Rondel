@@ -10,6 +10,16 @@ Versioning: the first number refers to the major version of Trope on which this 
 
 Written in yab using the Yabadabbadoo IDE
 
-MIT -LIcensed software
+MIT -LIcensed software.
+
+Dependencies:
+yab
+aspell
+perl
+sed
+awk
+python
+discount
+htmldoc
 
 Get it here: https://github.com/clasqm/Rondel

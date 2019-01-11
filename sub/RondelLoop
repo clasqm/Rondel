@@ -14,6 +14,11 @@ sub RondelLoop(Command$)
 			MakeHTML()
 			MakePDF("ps")
 			break
+		case "MenuView:File:Generate:EPUB"
+		case "MenuView:MarkDown:Generate:EPUB"
+			MakeHTML()
+			MakePDF("epub")
+			break
 		///////Markdown:Attributes	
 		case "MenuView:MarkDown:Attributes:Bold"
 			textedit add "EditBox", SetAttrib$("**","**")

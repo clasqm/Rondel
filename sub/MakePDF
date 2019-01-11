@@ -25,6 +25,7 @@ sub MakePDF(target$)
 	system(dothis$)
 	if target$ = "pdf"  dothis$ = "htmldoc -t pdf --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
 	if target$ = "ps"  dothis$ = "htmldoc -t ps--webpage -f " + CurrentFile$ + ".ps " + tempfile$
+	if target$ = "epub"  dothis$ = "htmldoc -t epub --webpage -f " + CurrentFile$ + ".epub " + tempfile$
 	system(dothis$)
 end sub
 

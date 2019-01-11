@@ -2,7 +2,7 @@
 
 by Michel Clasquin-Johnson
 
-Rondel is a Markdown-capable Text Editor with built-in ability to generate HTML files from Markdown files.
+Rondel is a Markdown-capable Text Editor with built-in ability to generate HTML and PDF  files from Markdown files.
 
 ![Rondel](rondel.png)
 
@@ -10,8 +10,6 @@ Versioning: the first number refers to the major version of Trope on which this 
 
 Written in yab using the Yabadabbadoo IDE
 
-Public Domain software
+MIT -LIcensed software
 
 Get it here: https://github.com/clasqm/Rondel
-
-Binaries: https://sourceforge.net/p/rondelforhaiku/

@@ -1,4 +1,6 @@
 PackagingFolder/**
+binder/Rondel
+binder/Rondel_bound
 
 # Backup files #
 ######################
@@ -17,7 +19,7 @@ PackagingFolder/**
 
 # Packages #
 ############
-# it's better to unpack these files and commit the raw source
+# its better to unpack these files and commit the raw source
 # git has its own built in compression methods
 *.hpkg
 *.7z
@@ -44,3 +46,63 @@ PackagingFolder/**
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# symlinks
+#######################
+sub/AddSpellAssistTerms
+sub/Backup
+sub/ChangeCase
+sub/ChangeCaseComp$
+sub/ChangeTitleBar
+sub/CharInsertToMenu
+sub/Charsheet
+sub/Check4Quotes
+sub/CheckSpelling
+sub/CheckTransfer
+sub/CloseWindow
+sub/Copy2Snippet
+sub/DeleteRecent
+sub/DocInfo
+sub/EditPersonalDict
+sub/FindLangdir$
+sub/FindString
+sub/GetAspellAbbr$
+sub/GetSettings
+sub/InsertFile
+sub/InsertIntoCharsheet
+sub/InsertLoremIpsum
+sub/MakeButtonbar
+sub/MakeCharSubmenu
+sub/MakeEditBox
+sub/MakeLorem
+sub/MakeMenu
+sub/MakeRecent
+sub/MakeStatusbar
+sub/NewFile
+sub/OpenFile
+sub/OpenWindow
+sub/ParsePath2Filename$
+sub/PasteSnippet
+sub/RefreshRecent
+sub/RefreshStatusbar
+sub/RegenerateRecent
+sub/ReplaceAll
+sub/ReplaceChar
+sub/SaveAs
+sub/SaveFile
+sub/SaveFileFirst
+sub/SaveSettings
+sub/SelectLanguageFirst
+sub/SetLanguage
+sub/ShowHelp
+sub/ShowHTMLHelp
+sub/SortSelection
+sub/TextFileCheck
+sub/Tools
+sub/TropeEditLoop
+sub/TropeFileLoop
+sub/TropeHelpLoop
+sub/TropeSettingsLoop
+sub/TropeToolbarOverlay
+mainloop
+

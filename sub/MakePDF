@@ -4,7 +4,7 @@ sub MakePDF(target$)
 ///The problem is in htmldoc, not here
 ///it generates files, all right, but they are unreadable.
 	local tempfile$, dothis$, htmlname$, arrsize, a$(1)
-	tempfile$ = TempDir()$ + "/temp_rondel.html"
+	tempfile$ = TempDir$() + "/temp_rondel.html"
 	arrsize = token(CurrentFile$,a$(), ".")
 	//normal name + 1 extension
 	if arrsize = 2 then
@@ -23,8 +23,8 @@ sub MakePDF(target$)
 	//htmldoc chokes on the <<doctype>> code
 	dothis$="sed '1d' " + htmlname$ + ">" + tempfile$
 	system(dothis$)
-	if target$ = "pdf"  dothis$ = "htmldoc --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
-	if target$ = "ps"  dothis$ = "htmldoc --webpage -f " + CurrentFile$ + ".ps " + tempfile$
+	if target$ = "pdf"  dothis$ = "htmldoc -t pdf --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
+	if target$ = "ps"  dothis$ = "htmldoc -t ps--webpage -f " + CurrentFile$ + ".ps " + tempfile$
 	system(dothis$)
 end sub
 

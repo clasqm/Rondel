@@ -51,11 +51,11 @@ sub RondelMoreMenus()
 	submenu "MarkDown", "Other", "Document Header", "", "MenuView"
 	submenu "MarkDown", "Other", "Horizontal Rule", "CR", "MenuView"
 	submenu "MarkDown", "Other", "Graphic", "CG", "MenuView"
-	menu "MarkDown","Generate HTML", "", "MenuView"
-	menu "File","Generate HTML", "", "MenuView"
-//	menu "MarkDown", "Generate PDF", "", "MenuView"
-//	menu "MarkDown", "Generate PostScript", "", "MenuView"
-//	menu "File", "Generate PDF", "", "MenuView"
-//	menu "File", "Generate PostScript", "", "MenuView"
+	submenu "MarkDown","Generate", "HTML", "", "MenuView"
+	submenu "File","Generate", "HTML", "", "MenuView"
+	submenu "MarkDown", "Generate", "PDF", "", "MenuView"
+	submenu "MarkDown", "Generate", "PostScript", "", "MenuView"
+	submenu "File", "Generate", "PDF", "", "MenuView"
+	submenu "File", "Generate", "PostScript", "", "MenuView"
 end sub
 

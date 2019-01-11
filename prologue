@@ -3,12 +3,13 @@
 // subroutines (i.e. the entire contents of the Trope /sub directory) to be copied
 //or symlinked into its own /sub directory 
 
-//Rondel v0.8.4.2
+//Rondel v0.9.4.2
 //Versioning: the first set of numbers refer to the major version of Trope on which this program is built.
 //The second number refers to Rondel-specific changes
 //The third number refers to updates of the included Markdown utility
 //By Michel Clasquin-Johnson
-//Public Domain software 2014
+//MIT-Licensed software 2019
+//Previously Public Domain Software 2014
 
 // set DEBUG = 1 to print out all messages on the console
 DEBUG = 1
@@ -16,11 +17,6 @@ DEBUG = 1
 import libclasqm_main
 
 ///////////////////INITIAL SETTING UP STUFF/////////////////
-
-//Create directories and files if they do not yet exist
-system("mkdir -p /boot/home/config/settings/Rondel")
-system("touch /boot/home/config/settings/Rondel/Rondel.settings")
-system("touch /boot/home/config/settings/Rondel/Rondel.recent")
 
 //Global Variables - declared here just for reference
  xorigin = 0
@@ -40,18 +36,28 @@ tempval = 0
 Snippet$ = ""
 dim RecentFile$(10)
 dim msg$(1)
-Language$ = ""
 autocomplete=0
 PrintError=0
+Language$ = ""
+LangDir$ = ""
+TextCount = 0
+Saved$ = "unsaved"
 
 //But these are for real
-AppName$ = "Rondel"
-//change executable filename manually after binding
-AppVersion$ = "v0.8.4.3"
-SettingsDir$ = "/boot/home/config/settings/Rondel/"
-SettingsFile$ =  SettingsDir$ +"Rondel.settings"
-RecentFile$ = SettingsDir$ +"Rondel.recent"
-PrintSetupFile$= SettingsDir$ +"printsetup"
+AppName$ = "Rondel" 
+AppVersion$ = "v0.9.9.4"
+SettingsDir$ = "/boot/home/config/settings/" + AppName$ + "/"
+SettingsFile$ = SettingsDir$ + AppName$ + ".settings"
+RecentFile$ = SettingsDir$ + AppName$ + ".recent"
+
+//Create directories and files if they do not yet exist
+system("mkdir -p " + SettingsDir$)
+system("touch " + SettingsFile$)
+system("touch " + RecentFile$)
+
+FindLangdir$()
+if DEBUG = 1 print LangDir$
+
 OpenWindow()
   
 //open file specified on the command line or passed along by the OS

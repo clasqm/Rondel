@@ -1,16 +1,16 @@
 sub RondelLoop(Command$)
 	Switch Command$
-		case "MenuView:File:Generate HTML"
-		case "MenuView:MarkDown:Generate HTML"
+		case "MenuView:File:Generate:HTML"
+		case "MenuView:MarkDown:Generate:HTML"
 			MakeHTML()
 			break
-		case "MenuView:File:Generate PDF"
-		case "MenuView:MarkDown:Generate PDF"
+		case "MenuView:File:Generate:PDF"
+		case "MenuView:MarkDown:Generate:PDF"
 			MakeHTML()
 			MakePDF("pdf")
 			break
-		case "MenuView:File:Generate Postscript"
-		case "MenuView:MarkDown:Generate Postscript"
+		case "MenuView:File:Generate:Postscript"
+		case "MenuView:MarkDown:Generate:Postscript"
 			MakeHTML()
 			MakePDF("ps")
 			break

@@ -3,12 +3,13 @@
 // subroutines (i.e. the entire contents of the Trope /sub directory) to be copied
 //or symlinked into its own /sub directory 
 
-//Rondel v0.8.4.2
+//Rondel v0.9.4.2
 //Versioning: the first set of numbers refer to the major version of Trope on which this program is built.
 //The second number refers to Rondel-specific changes
 //The third number refers to updates of the included Markdown utility
 //By Michel Clasquin-Johnson
-//Public Domain software 2014
+//MIT-Licensed software 2019
+//Previously Public Domain Software 2014
 
 // set DEBUG = 1 to print out all messages on the console
 DEBUG = 1
@@ -16,11 +17,6 @@ DEBUG = 1
 import libclasqm_main
 
 ///////////////////INITIAL SETTING UP STUFF/////////////////
-
-//Create directories and files if they do not yet exist
-system("mkdir -p /boot/home/config/settings/Rondel")
-system("touch /boot/home/config/settings/Rondel/Rondel.settings")
-system("touch /boot/home/config/settings/Rondel/Rondel.recent")
 
 //Global Variables - declared here just for reference
  xorigin = 0
@@ -40,18 +36,28 @@ tempval = 0
 Snippet$ = ""
 dim RecentFile$(10)
 dim msg$(1)
-Language$ = ""
 autocomplete=0
 PrintError=0
+Language$ = ""
+LangDir$ = ""
+TextCount = 0
+Saved$ = "unsaved"
 
 //But these are for real
-AppName$ = "Rondel"
-//change executable filename manually after binding
-AppVersion$ = "v0.8.4.3"
-SettingsDir$ = "/boot/home/config/settings/Rondel/"
-SettingsFile$ =  SettingsDir$ +"Rondel.settings"
-RecentFile$ = SettingsDir$ +"Rondel.recent"
-PrintSetupFile$= SettingsDir$ +"printsetup"
+AppName$ = "Rondel" 
+AppVersion$ = "v0.9.9.4"
+SettingsDir$ = "/boot/home/config/settings/" + AppName$ + "/"
+SettingsFile$ = SettingsDir$ + AppName$ + ".settings"
+RecentFile$ = SettingsDir$ + AppName$ + ".recent"
+
+//Create directories and files if they do not yet exist
+system("mkdir -p " + SettingsDir$)
+system("touch " + SettingsFile$)
+system("touch " + RecentFile$)
+
+FindLangdir$()
+if DEBUG = 1 print LangDir$
+
 OpenWindow()
   
 //open file specified on the command line or passed along by the OS
@@ -70,14 +76,13 @@ else
 end if
 
 /////////////Main Message Loop//////////////////
-//THis main loop was getting too large for conmfort and has been 
+//This main loop was getting too large for comfort and has been 
 //split up into a number of subroutines
 while(not leavingLoop)
 	sleep 0.01
 	nCommands = token(message$, msg$(), "|")
 	for everyCommand = 1 to nCommands
 		if(DEBUG and msg$(everyCommand)<>"") print msg$(everyCommand)
-		LanguageLoop(msg$(everyCommand))
 		TropeFileLoop(msg$(everyCommand))
 		TropeEditLoop(msg$(everyCommand))
 		TropeSettingsLoop(msg$(everyCommand))
@@ -117,16 +122,6 @@ while(not leavingLoop)
 			default:
 				break
 		end switch
-
-		//Check if user pressed ENTER in the search field
-		//if left$(msg$(everyCommand), 12) = "SearchField:" then
-		//	SearchText$ = trim$(mid$(msg$(everyCommand),13))
-		//	if SearchText$ <>"" then
-		//		Textcontrol set "SearchField", ""
-		//		Findstring(SearchText$)
-		//		menu set "Edit", "Find Again", "Enable", "MenuView" //after initial find, find again becomes available
-		//	end if
-		//end if
 
 		//Check if file has been dropped
 		if left$(msg$(everyCommand), 20) = "MainWindow:_Dropped:" then
@@ -169,58 +164,117 @@ while(not leavingLoop)
 			InsertLoremIpsum(msg$(everyCommand))
 		endif
 		
+		//Check if user selected a language
+		if left$(msg$(everyCommand),27)  = "MenuView:Settings:Language:" then
+			Language$ = right$(msg$(everyCommand), len(msg$(everyCommand))-27)
+			If Language$ = "None" then 
+				Language$ = ""
+				submenu set "Settings", "Autosuggest", "Assist OFF", "disable", "MenuView"
+				submenu set "Settings", "Autosuggest", "Assist ON", "disable", "MenuView"
+				submenu set "Settings", "Autosuggest", "Edit User's word list", "disable", "MenuView"
+				textedit set "EditBox", "has-autocompletion", 0
+			else
+				AddSpellAssistTerms()				
+			endif
+			ChangeTitleBar()
+		endif
+
+		//Check if user selected to install a language
+		if left$(msg$(everyCommand),26)  = "MenuView:Settings:Install:" then
+			Language$ = right$(msg$(everyCommand), len(msg$(everyCommand))-26)
+			system("/boot/system/apps/Terminal pkgman install aspell_" + GetAspellAbbr$())
+			Language$ = ""
+			alert "A restart is required before the new language will be selectable", "Info", "Ok"
+			ChangeTitleBar()
+		endif
+		
 		RefreshStatusbar()
 
 	next everyCommand
+
 	//Check if user has just entered text without doing anything else. Like saving.
-	if textedit get "EditBox", "textlength" > 0 FileIsOpen = 1
+//	if textedit get "EditBox", "textlength" > 0 FileIsOpen = 1
+	if TextCount <> textedit get "EditBox","textlength" then 
+		FileIsOpen = 1
+		if abs(TextCount - textedit get "EditBox","textlength") >30 then
+			Saved$ = "unsaved"
+			ChangeTitleBar()
+			TextCount = TextCount + 30
+		endif 
+	else
+		FileIsOpen = 0
+		Saved$ = "saved"
+	endif
 wend
-
 CloseWindow(0)
-
 end
 
-sub AddSpellAssistTerms(ChosenLanguage$)
+sub AddSpellAssistTerms()
 ######Trope subroutine#####
-	local InputFile$, NewTerm$, gotoline, streamhandle
-	SaveFileFirst("language")
-	//save the current position
-	gotoline=textedit get "EditBox", "currentline"
-	// need to remove, then recreate the editbox so that we can switch languages.
-	view remove "EditView"
-	// recreate it
-	MakeEditBox()	
-	if CurrentFile$ <> "" then //if empty file, skip this procedure
-		autocomplete=1
-		//reload file
-		OpenFile("--ReVeRtFiLe--","language")
-		//recover position in document
-		Textedit set "EditBox", "gotoline", gotoline
-	end if
-	InputFile$ = "/boot/system/data/SpellAssistDicts/languages/" +ChosenLanguage$
-	streamhandle = open(InputFile$, "r")
-	while(not EOF(1))	
-		line input #streamhandle NewTerm$
-		if NewTerm$ = "Dummy_file" then
-			alert "Spellcheck is available in the " + Language$ + " language, but SpellAssist has not yet been activated.", "OK", "none"
-		else
+	local InputFile$, UserFile$, NewTerm$, gotoline, streamhandle, abbr$
+	abbr$ = GetAspellAbbr$()
+	if FileIsOpen <>0 and CurrentFile$ = "" then
+		SaveFileFirst("language")
+	elseif CurrentFile$ <> "" 
+		SaveFile(CurrentFile$,0)
+	endif
+	if FileExists(LangDir$ + "/" + abbr$) then
+		system("notify --timeout 2 --title " + AppName$ + " \"Changing Autosuggest terms\" &")
+		InputFile$ = LangDir$ + "/" + abbr$
+		UserFile$ = SettingsDir$ + abbr$
+		system("touch " + UserFile$ )
+		
+			//save the current position
+		gotoline=textedit get "EditBox", "currentline"
+		// need to remove, then recreate the editbox so that we can switch languages.
+		view remove "EditView"
+		// recreate it
+		MakeEditBox()	
+		if CurrentFile$ <> "" then //if empty file, skip this procedure
+			autocomplete=1
+			//reload file
+			OpenFile("--ReVeRtFiLe--","language")
+			//recover position in document
+			Textedit set "EditBox", "gotoline", gotoline
+		end if
+		streamhandle = open(InputFile$, "r")
+		while(not EOF(streamhandle))	
+			line input #streamhandle NewTerm$
 			textedit set "EditBox", "autocomplete", NewTerm$
-		endif
-	wend
-	close streamhandle
-	autocomplete = 1
-	ChangeTitleBar()
+		wend
+		close #streamhandle
+		streamhandle = open(UserFile$, "r")
+		while(not EOF(streamhandle))	
+			line input #streamhandle NewTerm$
+			textedit set "EditBox", "autocomplete", NewTerm$
+		wend
+		close #streamhandle
+		submenu set "Settings", "Autosuggest", "Assist OFF", "enable", "MenuView"
+		submenu set "Settings", "Autosuggest", "Assist ON", "disable", "MenuView"
+		textedit set "EditBox", "has-autocompletion", 1
+		textedit set "EditBox", "autocomplete-start", 2
+		autocomplete=1
+		submenu set "Settings", "Autosuggest", "Edit User's word list", "enable", "MenuView"
+	else
+		alert "Spellcheck is available in the " + Language$ + " language, but Autosuggest has not yet been activated.", "OK", "none"
+		submenu set "Settings", "Autosuggest", "Assist OFF", "disable", "MenuView"
+		submenu set "Settings", "Autosuggest", "Assist ON", "disable", "MenuView"
+		textedit set "EditBox", "has-autocompletion", 0
+		autocomplete=0
+	endif
 end sub
 
 sub Backup()
 ######Trope subroutine#####
-	if CurrentFile$ <> "" SaveFile(CurrentFile$ + ".bkp")
+	if CurrentFile$ <> "" then
+		system("notify --timeout 1 --title " + AppName$ + " \"Backup in progress.\"  &")
+		SaveFile(CurrentFile$ + ".bkp",0)
+	endif
 end sub
 
 sub ChangeCase(switch$)
 ######Trope subroutine#####
 	local TextToChange$ , temp1$
-	if (DEBUG) print "Now in ChangeCase subroutine"
 	TextToChange$ = textedit get$ "EditBox","Selection"
 	if TextToChange$ = "" then
 		Alert "Please select the text to change case.", "OK", "none"
@@ -302,17 +356,16 @@ sub ChangeTitleBar()
 //change tab content
 	local tablang$		
 	if Language$ <> "" then
-		tablang$ = " (" + Language$
+		tablang$ = " (" + Language$ + ")"
 		if autocomplete =0 then
-			tablang$ = tablang$ + " - assist OFF)"
+			tablang$ = tablang$ + " - suggest OFF)"
 		elseif autocomplete = 1 then
-			tablang$ = tablang$ +" - assist ON)" 
+			tablang$ = tablang$ +" - suggest ON)" 
 		endif
 	else
 		tablang$ = " (No Language Selected)"
 	endif 
-
-	window set "MainWindow", "Title", AppName$ + ": " + ParsePath2Filename$(CurrentFile$) + tablang$
+	window set "MainWindow", "Title", AppName$ + ": " + ParsePath2Filename$(CurrentFile$) + " (" + Saved$ + ")"+ tablang$
 end sub
 
 sub CharInsertToMenu()
@@ -436,6 +489,7 @@ sub Charsheet()
 end sub
 
 sub Check4Quotes(SearchText$, ReplaceText$)
+######Trope subroutine#####
 	if instr(SearchText$, "\''") return 1
 	if instr(SearchText$, "'") return 1
 	if instr(SearchText$, "`") return 1
@@ -457,50 +511,36 @@ sub Check4Quotes(SearchText$, ReplaceText$)
 	return 0
 end sub
 
-sub CheckInstalledLangs(pack$)
-######Trope subroutine#####
-	local whereismyfile$, FullPath$
-	FullPath$ = "/boot/system/data/SpellAssistDicts" + "/" + pack$
-	whereismyfile$=system$("if test -e '" + FullPath$ + "'; then echo yeah; else echo nope;fi")
-	if left$(whereismyfile$,1)="n" submenu "Help", "Install...", "Language Pack " + right$ (pack$, 1), "", "MenuView"
-end sub
-
 sub CheckSpelling()
 ######Trope subroutine#####
-	local dothis$, langcode$, shortcode$, gotoline
+	local dothis$, langcode$, gotoline
 	gotoline=textedit get "EditBox", "currentline"
 	langcode$ = GetAspellAbbr$()
-	if len(langcode$)>2 shortcode$ = left$(langcode$, 2)
 	Textedit set "EditBox","editable", 0
 	textedit color "EditBox","textcolor", 185,185,185
 	View remove "MenuView"
 	if (view get "ToolbarOverlay", "exists") view remove "ToolbarOverlay"
-	dothis$ = "/boot/system/apps/Terminal aspell-x86   --encoding=utf-8 --dict-dir=/boot/system/data/SpellCheckDicts/languages/" + shortcode$
-	dothis$ = dothis$ + " -l " + langcode$ + " -c '" + CurrentFile$ + "'"
+	dothis$ = "/boot/system/apps/Terminal aspell -x -l " + langcode$ + " check '" + CurrentFile$ + "'"
 	system(dothis$)
 	MakeMenu()
 	MakeButtonbar()
 	OpenFile("--ReVeRtFiLe--", "language")
 	Textedit set "EditBox","editable", 1
-	textedit color "EditBox","textcolor", 0,0,0
+	Textedit color "EditBox","textcolor", 0,0,0
 	Textedit set "EditBox", "gotoline", gotoline
 end sub
 
 sub CheckTransfer()
 ######Trope subroutine#####
-	local whereismyfile$
-	if FileIsOpen = 1 then
 		Submenu set "File", "Transfer...", "to Pe", "enable", "MenuView"
 		Submenu set "File", "Transfer...", "to StyledEdit", "enable", "MenuView"
-		whereismyfile$=system$("if test -e /boot/system/apps/Rondel/Rondel; then echo yeah; else echo nope;fi")
-		if left$(whereismyfile$,1)="y" then 
-			if Appname$ <> "Trope" Submenu set "File", "Transfer...", "to Rondel", "enable", "MenuView"
-		endif
-		whereismyfile$=system$("if test -e /boot/system/apps/Trope/Trope; then echo yeah; else echo nope;fi")
-		if left$(whereismyfile$,1)="y" then 
-			if Appname$ <> "Rondel" Submenu set "File", "Transfer...", "to Trope", "enable", "MenuView"
-		endif
-	end if
+		if FileExists("/boot/system/apps/Kate/Kate") Submenu set "File", "Transfer...", "to Kate", "enable", "MenuView"
+		if FileExists("/boot/system/apps/Calligra/Words") Submenu set "File", "Transfer...", "to Calligra", "enable", "MenuView"
+		if FileExists("/boot/system/apps/LibreOffice/program/LibreOffice") Submenu set "File", "Transfer...", "to LibreOffice", "enable", "MenuView"
+		if FileExists("/boot/system/apps/Notepadqq/lib/notepadqq/Notepadqq") Submenu set "File", "Transfer...", "to Notepadqq", "enable", "MenuView"
+		if FileExists("/boot/system/apps/Koder") Submenu set "File", "Transfer...", "to Koder", "enable", "MenuView"
+		if FileExists("boot/system/apps/Rondel/Rondel") and Appname$ <> "Trope" Submenu set "File", "Transfer...", "to Rondel", "enable", "MenuView"
+		if FileExists("/boot/system/apps/Trope/Trope") and Appname$ <> "Rondel" Submenu set "File", "Transfer...", "to Trope", "enable", "MenuView"
 end sub
 
 sub CloseExcessWindows()
@@ -510,11 +550,11 @@ sub CloseExcessWindows()
 	if window get "GraphicWindow", "exists" = 1 window close "GraphicWindow"
 end sub
 
+sub CloseWindow(now)
 ######Trope subroutine#####
 // Close down the main window, but save settings first
-sub CloseWindow(now)
 	if now = 0 SaveFileFirst()
-	SaveSettings()
+	SaveSettings(0)
 	window close "MainWindow"
 	RefreshRecent()
 	return
@@ -528,7 +568,11 @@ sub Copy2Snippet()
 		alert "Too much text for a snippet!\nTry copying to the clipboard instead.", "OK", "none"
 		return
 	endif
-	if currentsel$ <> "" dropbox add "SnippetDropBox", currentsel$
+	if currentsel$ <> "" then
+		dropbox add "SnippetDropBox", currentsel$
+	else
+		dropbox add "SnippetDropBox", left$(clipboard paste$, 80)
+	endif
 	if dropbox count "SnippetDropBox" = 1 Snippet$ = currentsel$
 	if dropbox count "SnippetDropBox" > 15 dropbox remove "SnippetDropBox", 1
 end sub
@@ -541,6 +585,27 @@ sub DeleteRecent()
 	next f
 	streamhandle = open(RecentFile$, "w")
 	close streamhandle
+end sub
+
+sub DocInfo()
+######Trope subroutine#####
+	local docinfo$
+	if CurrentFile$ = "" then
+		alert "Please save the file first.", "OK", "warning"
+		return
+	endif
+	docinfo$ = "DOCUMENT INFORMATION\n"
+	docinfo$ = docinfo$ + "================\n\n"
+	docinfo$ = docinfo$ + "Filename: " + CurrentFile$ + "\n"
+	docinfo$ = docinfo$ + "Last changed: " + system$("date -r '" + CurrentFile$ + "'")
+	docinfo$ = docinfo$ + "\n"
+	docinfo$ = docinfo$ + "Words: " + system$("wc -w '" + CurrentFile$ + "' | cut -f1 -d ' '")
+	docinfo$ = docinfo$ + "Bytes: " + system$("wc -c '" + CurrentFile$ + "' | cut -f1 -d ' '")
+	docinfo$ = docinfo$ + "Characters: " + system$("wc -m '" + CurrentFile$ + "' | cut -f1 -d ' '")
+	docinfo$ = docinfo$ + "Lines/Paragraphs: " + system$("wc -l '" + CurrentFile$ + "' | cut -f1 -d ' '")
+	docinfo$ = docinfo$ + "\n"
+	docinfo$ = docinfo$ + "Longest Paragraph (in characters) is " + system$("wc -L '" + CurrentFile$ + "' | cut -f1 -d ' '") 
+	Alert docinfo$, "OK", "info"
 end sub
 
 sub EditPersonalDict()
@@ -556,6 +621,19 @@ sub EditPersonalDict()
 	system("/boot/system/apps/StyledEdit '" + dictfile$ + "' &")
 end sub
 
+sub FindLangdir$()
+######Trope subroutine#####
+	local thisdir$, AppNameLC$
+		AppNameLC$= lower$(AppName$)
+		thisdir$ = "/boot/system/data/" + AppNameLC$ + "dict" //standard location
+		if FileExists(thisdir$) LangDir$ = thisdir$
+		thisdir$ = "/boot/home/config/data/" + AppNameLC$ + "dict" //manual location
+		if FileExists(thisdir$) LangDir$ = thisdir$
+		thisdir$ = "/boot/home/git/" + AppName$ + "/other/data/" + AppNameLC$ + "dict" //development location
+		if FileExists(thisdir$) LangDir$ = thisdir$
+	return LangDir$	
+end sub
+
 sub Findstring(FindThis$)
 ######Trope subroutine#####
 	local linetogoto
@@ -564,109 +642,135 @@ sub Findstring(FindThis$)
 	option set "EditBox", "focus", true
 end sub
 
-sub FindUpdates()
-######Trope subroutine#####
-	local version$,selector
-		version$ = system$("curl --connect-timeout 1 " + UpdateFile$)
-	print version$
-	if left$(version$,1)<>"v" then
-		alert "Unable to connect to update server!", "OK", "warning"
-		return
-	endif
-	if version$ = AppVersion$ then
-		alert "You have the latest version of this program.", "OK", "info"
-		return
-	else
-		selector = alert "A newer version of this program is available. Take  a look?", "Yes", "No", "", "info"
-		if selector = 1 launch "http://mysite.mweb.co.za/residents/clasqm/haiku/yab-apps/index.html"
-	endif
-end sub
-
 sub GetAspellAbbr$()
 ######Trope subroutine#####
 	local abbr$
+	// Only contains languages that are currently available in the Haiku depots
+	//If new ones come around, they have to be entered in both the
+	//GetAspellAbbr$() and the SetLanguage() subroutines 
+
+	//Alphabetical order is not important in this section, except for ease of maintenance
+
 	switch Language$
-		case "English-GB"
+		case "None"
+			abbr$="none"
+			break
+		case "Belarussian"
+		case "Belarussian language support"
+			abbr$ ="be"
+			break
+		case "English - GB"
 			abbr$ ="en_GB"
 			break
-		case "English-US"
+		case "English - US"
 			abbr$ ="en_US"
 			break
-		case "Nederlands"
-			abbr$ ="nl_NL"
+		case "English - AU"
+			abbr$ ="en_AU"
 			break
-		case "Deutsch"
+		case "English - CA"
+			abbr$ ="en_CA"
+			break
+		case "English language support"
+			abbr$ = "en"
+			break
+		case "Bulgarian"
+		case "Bulgarian language support"
+			abbr$ ="bg"
+			break
+		case "Catalan"
+		case "Catalan language support"
+			abbr$ ="ca"
+			break
+		case "Croatian"
+		case "Croatian language support"
+			abbr$ ="hr"
+			break
+		case "Dutch"
+		case "Dutch language support"
+			abbr$ ="nl"
+			break
+		case "Esperanto"
+		case "Esperanto language support"
+			abbr$ ="eo"
+			break
+		case "German - DE"
 			abbr$ ="de_DE"
 			break
-		case "Français"
-			abbr$ ="fr_FR"
+		case "German - CH"
+			abbr$ ="de_CH"
 			break
-		case "Español"
-			abbr$ ="es_SP"
+		case "German language support"
+			abbr$ ="de"
 			break
-		case "Português-PT"
-			abbr$ ="pt_PT"
+		case "Finnish"
+		case "Finnish language support"
+			abbr$ ="fi"
 			break
-		case "Português-BR"
+		case "French"
+		case "French language support"
+			abbr$ ="fr"
+			break
+		case "Hungarian"
+		case "Hungarian language support"
+			abbr$ ="hu"
+			break
+		case "Italiian"
+		case "Italian language support"
+			abbr$ ="it"
+			break
+		case "Lithuanian"
+		case "Lithuanian language support"
+			abbr$ ="lt"
+			break
+		case "Polish"
+		case "Polish language support"
+			abbr$ = "pl"
+			break
+		case "Portuguese - BR"
 			abbr$ ="pt_BR"
 			break
-		case "Català"
-			abbr$ ="ca_SP"
+		case "Portuguese (BR) language support"
+			abbr$ ="pt_br"
 			break
-		case "Italiano"
-			abbr$ ="it_IT"
+		case "Portuguese - PT"
+			abbr$ ="pt_PT"
 			break
-		case "Română"
-			abbr$ ="ro_RO"
+		case "Portuguese (PT) language support"
+			abbr$ ="pt_pt"
 			break
-//		case "Afrikaans"
-//			abbr$ ="af"
-//			break
-//		case "Čeština"
-//			abbr$ ="cs"
-//			break
-//		case "Dansk"
-//			abbr$ ="da"
-//			break
-//		case "Esperanto"
-//			abbr$ ="eo"
-//			break
-//		case "Suomi"
-//			abbr$ ="fi"
-//			break
-//		case "Magyar"
-//			abbr$ ="hu"
-//			break
-//		case "Islenska"
-//			abbr$ ="is"
-//			break
-//		case "Nihongo"
-//			abbr$ ="ja"
-//			break
-//		case "Nynorsk"
-//			abbr$ ="nn"
-//			break
-//		case "Bokmål"
-//			abbr$ ="nb"
-//			break
-//		case "Norsk"
-//			abbr$ ="no"
-//			break
-//		case "Język polski"
-//			abbr$ ="pl"
-//			break
-//		case "Ру́сский язы́к"
-//			abbr$ ="ru"
-//			break
-//		case "Svenska"
-//			abbr$ ="sv"
-//			break
-//		case "Türkçe"
-//			abbr$ ="tr"
-//			break
-//		case "whatever"
-//			abbr$ ="xx"
-//			break
+		case "Romanian"
+		case "Romanian language support"
+			abbr$ ="ro"
+			break
+		case "Russian"
+		case "Russian language support"
+			abbr$ ="ru"
+			break
+		case "Serbian"
+		case "Serbian language support"
+			abbr$ ="sr"
+			break
+		case "Slovak"
+		case "Slovak language support"
+			abbr$ ="sk"
+			break
+		case "Slovenian"
+		case "Slovenian language support"
+			abbr$ ="sl"
+			break
+		case "Spanish"
+		case "Spanish language support"
+			abbr$ ="es"
+			break
+		case "Swedish"
+		case "Swedish language support"
+			abbr$ ="sv"
+			break
+		case "Ukrainian"
+		case "Ukrainian language support"
+			abbr$ ="uk"
+			break
 		default
 			break
 	end switch
@@ -675,22 +779,24 @@ end sub
 
 sub GetSettings()
 ######Trope subroutine#####
-	local streamhandle
+	local streamhandle,tempval$
 	streamhandle = open(SettingsFile$, "r")
-		line input #1 tempval$: xorigin = val(tempval$)
+		line input #streamhandle tempval$
+		xorigin = val(tempval$)
 		if xorigin = 0 then //ie if the settings file was empty
 			xorigin = 50 //reset xorigin, use defaults for others
-			close #1
+			close #streamhandle
 			return
 		else
-			line input #1 tempval$: yorigin = val(tempval$)
-			line input #1 tempval$: xwidth = val(tempval$)
-			line input #1 tempval$: yheight = val(tempval$)
-			line input #1 tempval$: WordWrap = val(tempval$)
-			line input #1 tempval$: Backup = val(tempval$)
-			line input #1 tempval$: Toolbar = val(tempval$)
+			line input #streamhandle tempval$: yorigin = val(tempval$)
+			line input #streamhandle tempval$: xwidth = val(tempval$)
+			line input #streamhandle tempval$: yheight = val(tempval$)
+			line input #streamhandle tempval$: WordWrap = val(tempval$)
+			line input #streamhandle tempval$: Backup = val(tempval$)
+			line input #streamhandle tempval$: Toolbar = val(tempval$)
+			line input #streamhandle Language$
+			close #streamhandle
 		end if
-	close streamhandle
 end sub
 
 sub HTML2text$(FileToOpen$)
@@ -747,6 +853,7 @@ end sub
 sub InsertLoremIpsum(author$)
 ######Trope subroutine#####
 	local authorlength, sentences$, selection, morerandom$, dothis$
+	if not(FileExists("/boot/home/config/non-packaged/bin/lorem4trope")) MakeLorem()
 	authorlength = len(author$)
 	author$ = right$(author$, authorlength - 30)
 	author$ = lower$(author$)
@@ -764,43 +871,9 @@ sub InsertLoremIpsum(author$)
 	end switch
 	selection = alert "Apply extra randomization?", "Yes", "", "No", "none" 
 	if selection = 1 morerandom$ = "--randomize"
-	dothis$ = "lorem --" + author$ + " -s " + sentences$ + " " + morerandom$ 
+	dothis$ = "/boot/home/config/non-packaged/bin/lorem4trope --" + author$ + " -s " + sentences$ + " " + morerandom$ 
 	dothis$ = system$(dothis$)
 	textedit add "EditBox", dothis$
-end sub
-
-sub InstallLanguagePack(pack$)
-######Trope subroutine#####
-	local tempfile$, entry$, streamhandle
-	tempfile$ = TempDir$() + "/add_langs"
-	streamhandle = open(tempfile$, "w")
-	print #streamhandle "#!/bin/sh"
-	print #streamhandle "Ready to install " + pack$ 
-	print #streamhandle "alert \"To install this Language Pack, you need to have the clasqm repo active - see the Help facility.\" OK" 
-	print #streamhandle "pkgman install " + pack$
-	print #streamhandle "alert \"Restart the editor to see the new languages.\" OK" 
-	system("chmod +x " + tempfile$)
-	system ("/boot/system/apps/Terminal " + tempfile$)
-	system("rm " + tempfile$)
-	close streamhandle
-end sub
-
-sub LanguageLoop(LongCmd$)
-######Trope subroutine#####
-	local LangName$
-	if (instr(LongCmd$, "Assist")) return
-	if left$(LongCmd$,27) <> "MenuView:Settings:Language:" then
-		return
-	else
-		LangName$ = right$(LongCmd$, len(LongCmd$)-27)
-		submenu set "Settings", "Language", "Assist ON", "disable", "MenuView"
-		submenu set "Settings", "Language", "Assist OFF", "enable", "MenuView"
-		textedit set "EditBox", "has-autocompletion", 1
-		textedit set "EditBox", "autocomplete-start", 3
-		Language$ = LangName$
-		AddSpellAssistTerms(Language$)
-		if (DEBUG) print Language$
-	endif
 end sub
 
 sub MakeAutoLink()
@@ -820,27 +893,29 @@ end sub
 sub MakeButtonbar()
 ######Trope subroutine#####
 	layout "Bottom, Left", "MainWindow"
-	Button 4,21 to 36,45, "NewButton", "⛋", "MenuView"
+	Button 4,23 to 42,48, "NewButton", "⛋New", "MenuView"
 	Tooltip "NewButton","Open a new window"
-	Button 44,21 to 76,45, "OpenButton", "☐", "MenuView"
+	Button 44,23 to 82,48, "OpenButton", "Opn☐", "MenuView"
 	Tooltip "OpenButton", "Open a  file"
-	Button 84,21 to 116,45, "SaveButton", "☑", "MenuView"
+	Button 84,23 to 122,48, "SaveButton", "Sav☑", "MenuView"
 	Tooltip "SaveButton", "Save this file"
-	Button 124,21 to 156,45, "UndoButton", "⇵", "MenuView"
+//	Option set "SaveButton", "enabled", 0
+	Button 124,23 to 162,48, "UndoButton", "U/R", "MenuView"
 	Tooltip "UndoButton", "Undo/Redo the last change"
-	Button 164,21 to 196,45, "CutButton", "✄⚳", "MenuView"
+	Button 164,23 to 202,48, "CutButton", "✄⚳Cut", "MenuView"
 	Tooltip "CutButton", "Cut selection to clipboard"
-	Button 204,21 to 236,45, "CopyButton", "⚢", "MenuView"
+	Button 204,23 to 242,48, "CopyButton", "⚢Cpy", "MenuView"
 	Tooltip "CopyButton", "Copy selection to clipboard"
-	Button 244,21 to 276,45, "PasteButton", "⚥", "MenuView"
+	Button 244,23 to 282,48, "PasteButton", "⚥Pst", "MenuView"
 	Tooltip "PasteButton", "Paste from clipboard"
-	Button 284,21 to 316,45, "FindButton", "⚲", "MenuView"
+	if clipboard paste$ = "" option set "PasteButton", "enabled", 0
+	Button 284,23 to 322,48, "FindButton", "⚲Find", "MenuView"
 	Tooltip "FindButton", "Find text entered in the searchbox"
-	Button 324,21 to 356,45, "FindAgainButton", "⚲⚲", "MenuView"
+	Button 324,23 to 362,48, "FindAgainButton", "FnA⚲⚲", "MenuView"
 	Tooltip "FindAgainButton", "Repeat the last search"
-	Button 364,21 to 396,45, "QuitButton", "⛔", "MenuView"
+	Button 364,23 to 402,48, "QuitButton", "⛔Quit", "MenuView"
 	Tooltip "QuitButton", "Close this window"
-	Button 404,21 to 436,45, "HelpButton", "⁇", "MenuView"
+	Button 404,23 to 442,48, "HelpButton", "Help", "MenuView"
 	Tooltip "HelpButton", "View help"
 	if Toolbar = 1 TropeToolbarOverlay()
 end sub
@@ -1026,6 +1101,22 @@ sub MakeLists(type$)
 	textedit add "EditBox", tempval$
 end sub
 
+sub MakeLorem()
+######Trope subroutine#####
+	local lorem$, loremfile$, streamhandle
+	loremfile$= "/boot/home/config/non-packaged/bin/lorem4trope"
+	system("notify --timeout 3 --title " + AppName$ + " \"Generating Lorem utility\" &")
+	streamhandle = open(loremfile$, "w")
+	restore Loremdata
+	do
+		read lorem$
+		if (lorem$ = "end_of_lorem_data") break
+		print #streamhandle, lorem$
+	loop
+	close streamhandle
+	system("chmod +x " + loremfile$)
+end sub
+
 sub MakeManualLink()
 ######Rondel-specific subroutine#####
 	local currentsel$, tempval$, linktext$, linkdata$, linktooltip$
@@ -1046,7 +1137,6 @@ end sub
 
 sub MakeMenu()
 ######Trope subroutine#####
-	local whereismyfile$
 	//////MENUS///////
 	layout "Top, Left", "MainWindow"
 	view 0,0 to xwidth,50, "MenuView", "MainWindow"
@@ -1057,28 +1147,41 @@ sub MakeMenu()
 	Menu "File", "Insert", "", "MenuView"
 	Menu "File", "Save", "S", "MenuView"
 	Menu "File", "Save As", "", "MenuView"
-	//Menu "File", "Printer setup", "", "MenuView"
-	//Menu "File",  "Print", "P", "MenuView"
-	//if FileExists(PrintSetupFile$) = 0 Menu set "File",  "Print", "disable", "MenuView"
+//	Menu set "File", "Save", "disable", "MenuView"
+//	Menu set "File", "Save As", "disable", "MenuView"
 	Menu "File", "Revert", "", "MenuView"
 	Menu set "File", "Revert", "disable", "MenuView"
 	Submenu "File", "Transfer...", "to Pe", "", "MenuView"
 	Submenu "File", "Transfer...", "to StyledEdit", "", "MenuView"
 	Submenu set "File", "Transfer...", "to Pe", "disable", "MenuView"
 	Submenu set "File", "Transfer...", "to StyledEdit", "disable", "MenuView"
-	whereismyfile$=system$("if test -e /boot/system/apps/Rondel/Rondel; then echo yeah; else echo nope;fi")
-	if left$(whereismyfile$,1)="y" then 
-			if AppName$ <> "Trope" then
-				Submenu "File", "Transfer...", "to Rondel", "", "MenuView"
-				Submenu set "File", "Transfer...", "to Rondel", "disable", "MenuView"
-			endif
+	if FileExists("/boot/system/apps/Kate/Kate") then
+		Submenu "File", "Transfer...", "to Kate", "", "MenuView"
+		Submenu set "File", "Transfer...", "to Kate", "disable", "MenuView"
 	endif
-	whereismyfile$=system$("if test -e /boot/system/apps/Trope/Trope; then echo yeah; else echo nope;fi")
-	if left$(whereismyfile$,1)="y" then 
-			if AppName$ <> "Rondel" then
-				Submenu "File", "Transfer...", "to Trope", "", "MenuView"
-				Submenu set "File", "Transfer...", "to Trope", "disable", "MenuView"
-			endif
+	if FileExists("/boot/system/apps/Calligra/Words") then
+		Submenu "File", "Transfer...", "to Calligra", "", "MenuView"
+		Submenu set "File", "Transfer...", "to Calligra", "disable", "MenuView"
+	endif
+	if FileExists("/boot/system/apps/LibreOffice/program/LibreOffice") then
+		Submenu "File", "Transfer...", "to LibreOffice", "", "MenuView"
+		Submenu set "File", "Transfer...", "to LibreOffice", "disable", "MenuView"
+	endif
+	if FileExists("/boot/system/apps/Notepadqq/lib/notepadqq/Notepadqq") then
+		Submenu "File", "Transfer...", "to Notepadqq", "", "MenuView"
+		Submenu set "File", "Transfer...", "to Notepadqq", "disable", "MenuView"
+	endif
+	if FileExists("/boot/system/apps/Koder") then
+		Submenu "File", "Transfer...", "to Koder", "", "MenuView"
+		Submenu set "File", "Transfer...", "to Koder", "disable", "MenuView"
+	endif
+	if FileExists("/boot/system/apps/Rondel/Rondel") and AppName$ <> "Trope" then
+		Submenu "File", "Transfer...", "to Rondel", "", "MenuView"
+		Submenu set "File", "Transfer...", "to Rondel", "disable", "MenuView"
+	endif
+	if FileExists("/boot/system/apps/Trope/Trope") and AppName$ <> "Rondel" then
+		Submenu "File", "Transfer...", "to Trope", "", "MenuView"
+		Submenu set "File", "Transfer...", "to Trope", "disable", "MenuView"
 	endif
 	Menu "File", "Info", "", "MenuView"
 	Menu "File", "Quit", "Q", "MenuView"
@@ -1092,7 +1195,10 @@ sub MakeMenu()
 	menu "Edit", "Cut", "X", "MenuView"
 	menu "Edit", "Copy", "C", "MenuView"
 	menu "Edit", "Paste", "V", "MenuView"
+	if clipboard paste$ = "" menu set "Edit", "Paste", "disable", "MenuView"
 	menu "Edit", "Copy to Snippet", "", "MenuView"
+	menu set "Edit", "Copy to Snippet", "disable", "MenuView"
+	if  clipboard paste$ <> "" menu set "Edit", "Copy to Snippet", "enable", "MenuView"
 	submenu "Edit", "Spacing", "Doublespace", "", "MenuView"
 	submenu "Edit", "Spacing", "Triplespace", "", "MenuView"
 	submenu "Edit", "Spacing", "Delete blank lines", "", "MenuView"
@@ -1133,7 +1239,7 @@ sub MakeMenu()
 	submenu "Edit", "Convert", "Unix (LF) to DOS (CR/LF)", "", "MenuView"
 	//submenu set "Edit", "Search", "Find Again", "Disable", "MenuView"
 	//after initial find, find again becomes available
-	// does not seem to work
+
 	
 	//////////ASCII & UNICODE MENUS/////////
 	CharInsertToMenu()
@@ -1162,19 +1268,20 @@ sub MakeMenu()
 	elseif Toolbar = 0 then
 		submenu set "Settings", "Toolbar", "Graphics Off", "disable", "MenuView"
 	end if
-	submenu "Settings", "Language", "Assist ON", "", "MenuView"
-	submenu "Settings", "Language", "Assist OFF", "", "MenuView"
-	submenu set "Settings", "Language", "Assist ON", "disable", "MenuView"
-	submenu set "Settings", "Language", "Assist OFF", "disable", "MenuView"
+	submenu "Settings", "Autosuggest", "Assist ON", "", "MenuView"
+	submenu "Settings", "Autosuggest", "Assist OFF", "", "MenuView"
+	submenu set "Settings", "Autosuggest", "Assist ON", "disable", "MenuView"
+	submenu set "Settings", "Autosuggest", "Assist OFF", "disable", "MenuView"
+	submenu "Settings", "Autosuggest", "Edit User's word list", "", "MenuView"
+	if Language$ = "" submenu set "Settings", "Autosuggest", "Edit User's word list", "disable", "MenuView"
 	SetLanguage()
-		
+
 	if AppName$ = "Rondel" RondelMoreMenus()
 	
 	//////HELP MENU//////
 	menu "Help", "Help", "H", "MenuView"
 	menu "Help", "HTML Help", "", "MenuView"
 	Menu "Help", "Characters ...", "", "MenuView"
-
 	submenu "Help", "Lorem Ipsum ...", "Cicero","", "MenuView"
 	submenu "Help", "Lorem Ipsum ...", "Boccaccio","", "MenuView"
 	submenu "Help", "Lorem Ipsum ...", "Goethe","", "MenuView"
@@ -1182,17 +1289,11 @@ sub MakeMenu()
 	submenu "Help", "Lorem Ipsum ...", "Strindberg","", "MenuView"
 	submenu "Help", "Lorem Ipsum ...", "emacs","", "MenuView"
 	submenu "Help", "Lorem Ipsum ...", "Poe","", "MenuView"
-	submenu "Help", "Lorem Ipsum ...", "Strandberg","", "MenuView"
 	submenu "Help", "Lorem Ipsum ...", "Bible","", "MenuView"
 	submenu "Help", "Lorem Ipsum ...", "Thoreau","", "MenuView"
-
-	//Only offer to download noninstalled language packs
-	for f = 0 to 2 	///change this value as more packs become available.
-		CheckInstalledLangs("pack" + str$(f))
-	next f
 	menu "Help", "About", "", "MenuView"
-	
-	end sub
+
+end sub
 
 sub MakePDF(target$)
 ######Rondel-specific subroutine#####
@@ -1200,7 +1301,7 @@ sub MakePDF(target$)
 ///The problem is in htmldoc, not here
 ///it generates files, all right, but they are unreadable.
 	local tempfile$, dothis$, htmlname$, arrsize, a$(1)
-	tempfile$ = TempDir()$ + "/temp_rondel.html"
+	tempfile$ = TempDir$() + "/temp_rondel.html"
 	arrsize = token(CurrentFile$,a$(), ".")
 	//normal name + 1 extension
 	if arrsize = 2 then
@@ -1219,8 +1320,8 @@ sub MakePDF(target$)
 	//htmldoc chokes on the <<doctype>> code
 	dothis$="sed '1d' " + htmlname$ + ">" + tempfile$
 	system(dothis$)
-	if target$ = "pdf"  dothis$ = "htmldoc --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
-	if target$ = "ps"  dothis$ = "htmldoc --webpage -f " + CurrentFile$ + ".ps " + tempfile$
+	if target$ = "pdf"  dothis$ = "htmldoc -t pdf --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
+	if target$ = "ps"  dothis$ = "htmldoc -t ps--webpage -f " + CurrentFile$ + ".ps " + tempfile$
 	system(dothis$)
 end sub
 
@@ -1229,7 +1330,7 @@ sub MakeRecent()
 	local tempval$,counter, streamhandle
 	streamhandle = open(RecentFile$, "r")
 	for f = 1 to 10
-		line input #1 tempval$
+		line input #streamhandle tempval$
 		if tempval$ <> "" then
 			counter = counter +1
 			RecentFile$(f) = tempval$
@@ -1269,13 +1370,13 @@ sub MakeStatusbar()
 	view 0, yheight-30 to xwidth, yheight, "StatusbarView", "MainWindow"
 	button 1,3 to 160,25, "StatusButton", "Status", "StatusbarView"
 	tooltip "StatusButton", "Click to refresh"
-	Textcontrol 162, 5 to 295, 25, "SearchField", "", "Enter search term", "StatusbarView"
+	Textcontrol 165, 5 to 250, 25, "SearchField", "", "Search term", "StatusbarView"
 	tooltip "SearchField", "Enter the word or phrase to\nsearch for, then press ALT-F."
-	Textcontrol 300,5 to 433,25, "ReplacementField", "", "Enter replacement term", "StatusbarView"
+	Textcontrol 255,5 to 350,25, "ReplacementField", "", "Replacement", "StatusbarView"
 	tooltip "ReplacementField", "Enter the word or phrase to\nglobally replace the search\nterm, then press ALT-R."
-	dropbox 435,5 to 585,25, "SnippetDropBox", "", "StatusbarView"
+	dropbox 355,5 to 440,25, "SnippetDropBox", "", "StatusbarView"
 	tooltip "SnippetDropBox","select a snippet here and press\nthe button to the right to insert it." 
-	button 590, 5 to 612,25, "PasteSnippetButton", "✔", "StatusbarView"
+	button 445, 5 to 465,25, "PasteSnippetButton", "P✔", "StatusbarView"
 	tooltip "PasteSnippetButton", "Press this button to insert\nthe currently selected snippet."
 	
 end sub
@@ -1305,78 +1406,39 @@ end sub
 
 sub NewFile()
 ######Trope subroutine#####
-	local whereistrope$,whereisRondel$,RunCommand$
-	if AppName$ = "Trope" then
-	//////////Locate Trope///////////
-		//Try the PM packaged local location first
-		whereistrope$=system$("if test -e /boot/home/config/apps/Trope/Trope; then echo yeah; else echo nope;fi")
-			if left$(whereistrope$,1)="y" RunCommand$= "/boot/home/config/apps/Trope/Trope"
-		//Try the PM packaged lsystem location
-		if RunCommand$= "" then 
-			whereistrope$=system$("if test -e /boot/system/apps/Trope/Trope; then echo yeah; else echo nope;fi")
-			if left$(whereistrope$,1)="y" RunCommand$= "/boot/system/apps/Trope/Trope"
-		endif
-		//Try the PM non-packaged location
-		if RunCommand$= "" then 
-			whereistrope$=system$("if test -e /boot/home/config/non-packaged/apps/Trope/Trope; then echo yeah; else echo nope;fi")
-			if left$(whereistrope$,1)="y" RunCommand$= "/boot/home/config//non-packaged/apps/Trope/Trope"
-		endif
-		//Try the Desktop
-		if RunCommand$= "" then
-			whereistrope$=system$("if test -e /boot/home/Desktop/Trope; then echo yeah; else echo nope;fi")
-			if left$(whereistrope$,1)="y" RunCommand$= "/boot/home/Desktop/Trope"
-		endif
-		//One last shot - for development only
-		if RunCommand$= "" then
-			whereistrope$=system$("if test -e /boot/home/projects/Trope/binder/Trope.yab; then echo yeah; else echo nope;fi")
-			if left$(whereistrope$,1)="y" RunCommand$= "/boot/home/projects/Trope/binder/Trope.yab"
-		endif
-		//Give up
-		if RunCommand$= "" then
-			alert "Trope executable not found in any standard location.", "OK" , "warning"
-			return
-		endif
- 		SaveOffsetSettings()
- 		system(RunCommand$ + " &")
-	elseif AppName$ = "Rondel" then
-		//////////Locate Rondel///////////
-		//Try the PM packaged local location first
-		whereisRondel$=system$("if test -e /boot/home/config/apps/Rondel/Rondel; then echo yeah; else echo nope;fi")
-			if left$(whereisRondel$,1)="y" RunCommand$= "/boot/home/config/apps/Rondel/Rondel"
-		//Try the PM packaged system location
-		if RunCommand$= "" then
-			whereisRondel$=system$("if test -e /boot/system/apps/Rondel/Rondel; then echo yeah; else echo nope;fi")
-			if left$(whereisRondel$,1)="y" RunCommand$= "/boot/system/apps/Rondel/Rondel"
-		endif
-		//Try the PM non-packaged location
-		if RunCommand$= "" then 
-			whereisRondel$=system$("if test -e /boot/home/config//non-packaged/apps/Rondel/Rondel; then echo yeah; else echo nope;fi")
-			if left$(whereisRondel$,1)="y" RunCommand$= "/boot/home/config//non-packaged/apps/Rondel/Rondel"
-		endif
-		//Try the Desktop
-		if RunCommand$= "" then
-			whereisRondel$=system$("if test -e /boot/home/Desktop/Rondel; then echo yeah; else echo nope;fi")
-			if left$(whereisRondel$,1)="y" RunCommand$= "/boot/home/Desktop/Rondel"
-		endif
-		//One last shot - for development only
-		if RunCommand$= "" then
-			whereisRondel$=system$("if test -e /boot/home/projects/Rondel/binder/Rondel.yab; then echo yeah; else echo nope;fi")
-			if left$(whereisRondel$,1)="y" RunCommand$= "/boot/home/projects/Rondel/binder/Rondel.yab"
-		endif
-		//Give up
-		if RunCommand$= "" then
-			alert "Rondel executable not found in any standard location.", "OK" , "warning"
-			return
-		endif
- 		SaveOffsetSettings()
- 		system(RunCommand$ + " &")
+	local RunCommand$
+	//Try the PM packaged system location
+	if FileExists("/boot/system/apps/" + AppName$ + "/"  + AppName$) RunCommand$= "/boot/system/apps/" + AppName$ + "/"  + AppName$
+	if RunCommand$= "" then
+		//Try the PM packaged local location
+		if FileExists("/boot/home/config/apps/" + AppName$ + "/"  + AppName$) RunCommand$= "/boot/home/config/apps/" + AppName$ + "/"  + AppName$
 	endif
+	if RunCommand$= "" then 
+		//Try the PM non-packaged location
+		if FileExists("/boot/home/config/non-packaged/apps/" + AppName$ + "/"  + AppName$) RunCommand$= "/boot/home/config/non-packaged/apps/" + AppName$ + "/"  + AppName$
+	endif
+	if RunCommand$= "" then
+		//One last shot - for development only
+		//script first
+		if FileExists("/boot/home/git/" + AppName$ + "/binder/" + AppName$ + ".yab") RunCommand$= "/boot/home/git/" + AppName$ + "/binder/" + AppName$ + ".yab"
+	endif
+	if RunCommand$= "" then
+	//compiled binary, then?
+		if FileExists("/boot/home/git/" + AppName$ + "/binder/" + AppName$) RunCommand$= "/boot/home/git/" + AppName$ + "/binder/" + AppName$
+	endif
+	//Give up
+	if RunCommand$= "" then
+		alert "Trope executable not found in any standard location.", "OK" , "warning"
+		return
+	endif
+	SaveSettings(1)
+	system(RunCommand$ + " &")
 end sub
 
 sub OpenFile(FileToOpen$, fromwhere$)
 ######Trope subroutine#####
 //should really be OpenWindow - called this for historic reasons
-	local tempval$,tempval,revertfile, whereismyfile$, streamhandle
+	local tempval$,tempval,revertfile, streamhandle
 	if FileToOpen$ = "--ReVeRtFiLe--" revertfile=1
 	if FileToOpen$ = "" then
 		FileToOpen$= filepanel "Load-File", "Select text file to open", "/boot/home/"
@@ -1398,8 +1460,7 @@ sub OpenFile(FileToOpen$, fromwhere$)
 		end if
 	end if
 	//check if file exists
-	whereismyfile$=system$("if test -e '" + FileToOpen$ + "'; then echo yeah; else echo nope;fi")
-	if left$(whereismyfile$,1)="n"  then
+	if not(FileExists(FileToOpen$)) then
 		Alert "File Not found!\nIt may have been deleted.", "OK", "Stop"
 		return
 	end if
@@ -1423,6 +1484,7 @@ sub OpenFile(FileToOpen$, fromwhere$)
 		Alert "A file is already loaded in this window. Please open a new window first.", "OK", "info"
 		return
 	else
+		system("notify --timeout 3 --title " + AppName$ + " \"Opening file\" &")
 		streamhandle = open(FileToOpen$, "r")
 		While (not eof(1))
 			line input #streamhandle tempval$
@@ -1434,13 +1496,13 @@ sub OpenFile(FileToOpen$, fromwhere$)
 		ChangeTitleBar()	
 	end if
 	CheckTransfer() //enable transfer menu now that a file has been opened
+	TextCount = textedit get "EditBox","textlength"
 end sub
 
 sub OpenWindow()
 ######Trope subroutine#####
 // Setup the main window here
-	local whereismyfile$
-	local maxwidth, tempval$
+	local maxwidth
 	maxwidth = 1000:xorigin = 50: yorigin = 50: xwidth = 480: yheight = 500
 	//Read positions settings from settings file
 	GetSettings()
@@ -1450,26 +1512,24 @@ sub OpenWindow()
 	if yheight > peek("DesktopHeight") yheight = peek("DesktopHeight") - 50
 	if xorigin > (peek("DesktopWidth")) - 100 xorigin = 50
 	if yorigin > (peek("DesktopHeight")) - 100 yorigin = 50
-	
 	/////////MAIN WINDOW///////////
 	window open xorigin,yorigin to xorigin + xwidth,yorigin + yheight, "MainWindow", AppName$ + ": Unsaved File "
 	window set "MainWindow", "MaximumTo", maxwidth,800
 	window set "MainWindow", "MinimumTo", xwidth,310
 	View Dropzone "MainWindow" //Make MainWindow droppable
-
 	MakeMenu()
-	
 	MakeButtonbar()
-		
 	MakeStatusbar()
-		
 	MakeEditBox()
+	if Language$ <> "" AddSpellAssistTerms()
+	ChangeTitleBar()
 end sub
 
 sub ParsePath2Filename$(Path2Parse$)
 ######Trope subroutine#####
 	local result$,arrsize, a$(1)
-	if Path2Parse$ = "" return ""
+	
+	if Path2Parse$ = "" return "New File"
 	arrsize = token(Path2Parse$,a$(), "/")
 	result$ = a$(arrsize) 
 	return result$
@@ -1501,7 +1561,7 @@ sub RefreshStatusbar()
 ######Trope subroutine#####
 	local TotalWords, TotalChars, TotalPages, tempval$, w$(1), tempval2$
 		TotalChars = textedit get "EditBox", "textlength"
-		if TotalChars >0 FileIsOpen = 1
+		if Totalchars >0 FileIsOpen = 1
 		tempval2$ = textedit get$ "EditBox"
 		TotalWords = token(tempval2$, w$(), " \t\n")
 		tempval$ = " words/"
@@ -1567,7 +1627,7 @@ sub ReplaceAll()
 	endif
 	switch tempval1
 		case 1
-			SaveFileFirst()
+			SaveFile(CurrentFile$,0)
 			gotoline=textedit get "EditBox", "currentline"
 			tempfile1$ = TempDir$() + "/toreplace"
 			streamhandle = open(tempfile1$, "w")
@@ -1587,7 +1647,7 @@ sub ReplaceAll()
 			system("rm -f " + tempfile1$)
 			break
 		case 2
-			SaveFileFirst()
+			SaveFile(CurrentFile$,0)
 			TropeFileLoop("MenuView:File:Transfer...:to Pe")
 			break
 		case 3
@@ -1609,17 +1669,17 @@ end sub
 
 sub RondelLoop(Command$)
 	Switch Command$
-		case "MenuView:File:Generate HTML"
-		case "MenuView:MarkDown:Generate HTML"
+		case "MenuView:File:Generate:HTML"
+		case "MenuView:MarkDown:Generate:HTML"
 			MakeHTML()
 			break
-		case "MenuView:File:Generate PDF"
-		case "MenuView:MarkDown:Generate PDF"
+		case "MenuView:File:Generate:PDF"
+		case "MenuView:MarkDown:Generate:PDF"
 			MakeHTML()
 			MakePDF("pdf")
 			break
-		case "MenuView:File:Generate Postscript"
-		case "MenuView:MarkDown:Generate Postscript"
+		case "MenuView:File:Generate:Postscript"
+		case "MenuView:MarkDown:Generate:Postscript"
 			MakeHTML()
 			MakePDF("ps")
 			break
@@ -1815,12 +1875,12 @@ sub RondelMoreMenus()
 	submenu "MarkDown", "Other", "Document Header", "", "MenuView"
 	submenu "MarkDown", "Other", "Horizontal Rule", "CR", "MenuView"
 	submenu "MarkDown", "Other", "Graphic", "CG", "MenuView"
-	menu "MarkDown","Generate HTML", "", "MenuView"
-	menu "File","Generate HTML", "", "MenuView"
-//	menu "MarkDown", "Generate PDF", "", "MenuView"
-//	menu "MarkDown", "Generate PostScript", "", "MenuView"
-//	menu "File", "Generate PDF", "", "MenuView"
-//	menu "File", "Generate PostScript", "", "MenuView"
+	submenu "MarkDown","Generate", "HTML", "", "MenuView"
+	submenu "File","Generate", "HTML", "", "MenuView"
+	submenu "MarkDown", "Generate", "PDF", "", "MenuView"
+	submenu "MarkDown", "Generate", "PostScript", "", "MenuView"
+	submenu "File", "Generate", "PDF", "", "MenuView"
+	submenu "File", "Generate", "PostScript", "", "MenuView"
 end sub
 
 sub SaveAs()
@@ -1831,74 +1891,75 @@ sub SaveAs()
 		return
 	else
 		CurrentFile$ = FileToSave$
-		SaveFile(CurrentFile$)
+		SaveFile(CurrentFile$,1)
 		ChangeTitleBar()
 	end if
 end sub
 
-sub SaveFile(SaveFile$)
+sub SaveFile(SaveFile$, notify)
 ######Trope subroutine#####
-	local streamhandle
+	local streamhandle	
+	if (notify) system("notify --timeout 3 --title " + AppName$ + " \"Saving file\" &")
 	streamhandle = Open(SaveFile$, "w")
 	print #streamhandle textedit get$ "EditBox"
 	close streamhandle
 	system("mimeset -F '" + SaveFile$ + "'")
-	Menu set "File", "Revert", "enable", "MenuView"
+	TextCount = textedit get "EditBox","textlength"
+	FileIsOpen = 0
+	Saved$ = "saved"
 	ChangeTitleBar()
 end sub
 
 sub SaveFileFirst(fromwhere$)
 ######Trope subroutine#####
 	local SaveFirst
-	if FileIsOpen <> 0 then
+	if FileIsOpen = 0 then
+		return
+	elseif textedit get "EditBox", "hasChanged"= 0 then
+		return
+	elseif textedit get "EditBox", "textlength" = 0 then
+		return
+	elseif FileIsOpen <> 0 then
 		if fromwhere$ = "language" then
 			if CurrentFile$ = "" then
 				alert "You need to save your file first.", "OK", "warning"
 				SaveAs()
 			else
-				SaveFile(CurrentFile$)
+				SaveFile(CurrentFile$,1)
 			end if
 			return
 		elseif fromwhere$ = "" then
-			SaveFirst= Alert "A file is currently open.\nSave it before proceeding?", "Yes", "No", "", "warning"
+			SaveFirst= Alert "A file is currently open and is " + Saved$ + ".\nSave it before proceeding?", "Yes", "No", "", "warning"
 			if SaveFirst = 1 then
 				if CurrentFile$ = "" then
 					SaveAs()
 				else
-					SaveFile(CurrentFile$)
+					SaveFile(CurrentFile$,1)
 				end if	
 			end if
 		end if
 	end if	
 end sub
 
-sub SaveOffsetSettings()
+sub SaveSettings(offset)
 ######Trope subroutine#####
-	local streamhandle
-	xorigin = (window get "MainWindow", "position-x") + 20
-	yorigin = (window get "MainWindow", "position-y") + 45
+	local streamhandle, xorigin, yorigin
 	streamhandle = open(SettingsFile$, "w")
-	print #streamhandle str$(xorigin)
-	print #streamhandle str$(yorigin)
+	xorigin = (window get "MainWindow", "position-x")
+	yorigin = (window get "MainWindow", "position-y")
+	if (offset) then
+		print #streamhandle xorigin + 20
+		print #streamhandle yorigin + 45
+	else
+		print #streamhandle xorigin
+		print #streamhandle yorigin
+	endif
 	print #streamhandle window get "MainWindow", "width"
 	print #streamhandle window get "MainWindow", "height"
 	print #streamhandle str$(WordWrap)
 	print #streamhandle str$(Backup)
 	print #streamhandle str$(Toolbar)
-	close streamhandle
-end sub
-
-sub SaveSettings()
-######Trope subroutine#####
-	local streamhandle
-	streamhandle = open(SettingsFile$, "w")
-	print #streamhandle window get "MainWindow", "position-x"
-	print #streamhandle window get "MainWindow", "position-y"
-	print #streamhandle window get "MainWindow", "width"
-	print #streamhandle window get "MainWindow", "height"
-	print #streamhandle str$(WordWrap)
-	print #streamhandle str$(Backup)
-	print #streamhandle str$(Toolbar)
+	print #streamhandle Language$
 	close streamhandle
 end sub
 
@@ -1931,21 +1992,144 @@ end sub
 
 sub SetLanguage()
 ######Trope subroutine#####
-	local tempfile$, entry$, streamhandle
-	tempfile$ = TempDir$() + "/trope_langs"
-	system("ls /boot/system/data/SpellAssistDicts/languages>" + tempfile$)
-	streamhandle = Open(tempfile$, "r")
-	while(not eof(1))
-		line input #1 entry$
-		submenu "Settings", "Language", entry$, "", "MenuView"
-	wend
-	close streamhandle
-	system("rm " + tempfile$)
+	local installedlang$
+	installedlang$ = system$("ls /boot/system/packages/aspell_*")
+
+	// only contains languages that are currently available in the Haiku depots
+	//If new ones come around, they have to be entered in both the
+	//GetAspellAbbr$() and the SetLanguage() subroutines 
+	submenu "Settings", "Language", "None", "", "MenuView"
+	//Maintain alphabetical order of langauge NAMES (in English) in this section.
+	if instr(installedlang$, "aspell_be") then
+		submenu "Settings", "Language", "Belarussian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Belarussian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_bg") then
+		submenu "Settings", "Language", "Bulgarian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Bulgarian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_ca") then
+		submenu "Settings", "Language", "Catalan", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Catalan language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_hr") then
+		submenu "Settings", "Language", "Croatian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Croatian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_nl") then
+		submenu "Settings", "Language", "Dutch", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Dutch language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_en") then
+		submenu "Settings", "Language", "English - AU", "", "MenuView"
+		submenu "Settings", "Language", "English - CA", "", "MenuView"
+		submenu "Settings", "Language", "English - GB", "", "MenuView"
+		submenu "Settings", "Language", "English - US", "", "MenuView"
+	else
+		submenu "Settings", "Install", "English language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_eo") then
+		submenu "Settings", "Language", "Esperanto", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Esperanto language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_de") then
+		submenu "Settings", "Language", "German - DE", "", "MenuView"
+		submenu "Settings", "Language", "German - CH", "", "MenuView"
+	else
+		submenu "Settings", "Install", "German language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_fi") then
+		submenu "Settings", "Language", "Finnish", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Finnish language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_fr") then
+		submenu "Settings", "Language", "French", "", "MenuView"
+	else
+		submenu "Settings", "Install", "French language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_hu") then
+		submenu "Settings", "Language", "Hungarian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Hungarian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_it") then
+		submenu "Settings", "Language", "Italian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Italian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_lt") then
+		submenu "Settings", "Language", "Lithuanian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Lithuanian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_pl") then
+		submenu "Settings", "Language", "Polish", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Polish language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_pt_br") then
+		submenu "Settings", "Language", "Portuguese - BR", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Portuguese (BR) language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_pt_pt") then
+		submenu "Settings", "Language", "Portuguese - PT", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Portuguese (PT) language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_ro") then
+		submenu "Settings", "Language", "Romanian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Romanian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_ru") then
+		submenu "Settings", "Language", "Russian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Russian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_sr") then
+		submenu "Settings", "Language", "Serbian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Serbian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_sk") then
+		submenu "Settings", "Language", "Slovak", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Slovak language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_sl") then
+		submenu "Settings", "Language", "Slovenian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Slovenian language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_es") then
+		submenu "Settings", "Language", "Spanish", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Spanish language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_sv") then
+		submenu "Settings", "Language", "Swedish", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Swedish language support", "", "MenuView"
+	endif
+	if instr(installedlang$, "aspell_uk") then
+		submenu "Settings", "Language", "Ukrainian", "", "MenuView"
+	else
+		submenu "Settings", "Install", "Ukrainian language support", "", "MenuView"
+	endif
 end sub
 
 sub ShowHelp()
 ######Trope subroutine#####
-local CenterX, CenterY, help$
+	local CenterX, CenterY, help$
+	system("notify --timeout 3 --title " + AppName$ + " \"Generating text help\" &")
 	CenterX = INT((Window Get "MainWindow", "Width")/2) + (Window Get "MainWindow","Position-X")
 	CenterY = INT((Window Get "MainWindow", "Height")/2) + (Window Get "MainWindow","Position-Y")
 	Window Open CenterX, CenterY to CenterX + 400, CenterY + 400, "HelpBox", "Trope Help"
@@ -1964,25 +2148,30 @@ end sub
 
 sub ShowHTMLHelp()
 ######Trope subroutine#####
-local help$, helpfile$, dothis$, streamhandle
-	helpfile$ = TempDir$() + "/Trope.html"
-	streamhandle = open(helpfile$, "w")
-	restore Helpdata
-	do 
-		read help$
-		if (help$ = "end_of_help_data") break
-		if left$(help$,2) = "<h" or left$(help$,3) = "</h" then
-			print #streamhandle, help$ 
-		elseif help$ = "<b>" or help$ = "</b>" then
-			print #streamhandle, help$ 
-		elseif help$ =" " then
-			print #streamhandle, "<br>"
-		else
-			print #streamhandle, help$ + "<br>"
-		end if
-	loop
-	close streamhandle
-	launch helpfile$
+	local help$, helpfile$, streamhandle
+		helpfile$ = TempDir$() + "/" + AppName$ + ".html"
+	if FileExists(helpfile$) then
+		launch helpfile$
+	else
+		system("notify --timeout 2 --title " + AppName$ + " \"Generating HTML help\" &")
+		streamhandle = open(helpfile$, "w")
+		restore Helpdata
+		do 
+			read help$
+			if (help$ = "end_of_help_data") break
+			if left$(help$,2) = "<h" or left$(help$,3) = "</h" then
+				print #streamhandle, help$ 
+			elseif help$ = "<b>" or help$ = "</b>" then
+				print #streamhandle, help$ 
+			elseif help$ =" " then
+				print #streamhandle, "<br>"
+			else
+				print #streamhandle, help$ + "<br>"
+			endif
+		loop
+		close streamhandle
+		launch helpfile$
+	endif
 end sub
 
 sub SortSelection(switch$)
@@ -2026,8 +2215,11 @@ end sub
 sub Tools(switch$)
 ######Trope subroutine#####
 	local tempval1$, tempfile1$, dothis$, gotoline, streamhandle
-	SaveFileFirst()
-		if CurrentFile$="" return
+	if CurrentFile$="" then 
+		SaveFileFirst("language")
+//	else
+//		SaveFile(CurrentFile$,0)
+	endif
 		gotoline=textedit get "EditBox", "currentline"
 		tempfile1$ = TempDir$() + "/toolkit"
 		streamhandle = open(tempfile1$, "w")
@@ -2102,7 +2294,7 @@ end sub
 
 sub TropeEditLoop(Command$)
 ######Trope subroutine#####
-	local response
+	local response, tempval$
 	switch Command$
 		case "MenuView:Edit:Undo/Redo":
 		case "UndoButton"
@@ -2111,10 +2303,16 @@ sub TropeEditLoop(Command$)
 		case "MenuView:Edit:Copy":
 		case "CopyButton":
 			Textedit set "EditBox", "copy"
+			menu set "Edit", "Paste", "enable", "MenuView"
+			menu set "Edit", "Copy to Snippet", "enable", "MenuView"
+			option set "PasteButton", "enabled", 1
 			break
 		case "MenuView:Edit:Cut":
 		case "CutButton":
 			Textedit set "EditBox", "cut"
+			menu set "Edit", "Paste", "enable", "MenuView"
+			menu set "Edit", "Copy to Snippet", "enable", "MenuView"
+			option set "PasteButton", "enabled", 1
 			break
 		case "MenuView:Edit:Paste":
 		case "PasteButton":
@@ -2156,6 +2354,10 @@ sub TropeEditLoop(Command$)
 		case "MenuView:Edit:Select:Clear All":
 			Textedit set "EditBox", "select-all"
 			Textedit set "EditBox", "clear"
+			Menu set "File", "Save", "disable", "MenuView"
+			Menu set "File", "Save As", "disable", "MenuView"
+			Option set "SaveButton", "enabled", 0
+			FileIsOpen = 0
 			break
 		case "MenuView:Edit:Search:Find":
 		case "FindButton"
@@ -2271,21 +2473,20 @@ sub TropeFileLoop(Command$)
 			OpenFile()
 			RegenerateRecent()
 			break
-		case "MenuView:File:Save":
+		case "MenuView:File:Save"
 		case "SaveButton"
 			if CurrentFile$ = "" then
 				SaveAs()
 				RegenerateRecent()
 			else
-				SaveFile(CurrentFile$)
+				if Backup <> 0 Backup()
+				SaveFile(CurrentFile$, 1)
 			end if
-			FileIsOpen=1
 			CheckTransfer()
-			if Backup <> 0 Backup()
 			break
 		case "MenuView:File:Save As":
-			SaveAs()
 			if Backup <> 0 Backup()
+			SaveAs()
 			RegenerateRecent()
 			break
 		case "MenuView:File:Insert"
@@ -2298,56 +2499,66 @@ sub TropeFileLoop(Command$)
 			printer setup PrintSetupFile$
 			Menu set "File",  "Print", "enable", "MenuView"
 			break
-		case "MenuView:File:Print"
-			PrintError=Printer CurrentFile$, PrintSetupFile$, "EditBox"
-			if PrintError Alert "An error occured. What can I say? Printing on Haiku is full of bugs.", "Ok", "info"
-			break		
 		case "MenuView:File:Transfer...:to Pe":
-			SaveFile(CurrentFile$)
-			//first try the post Alpha4.1 location
-			if(open(9,"/boot/system/apps/Pe/Pe")) then
-				system("/boot/system/apps/Pe/Pe '" + CurrentFile$ + "' &")
-			//now try the old location
-			elseif(open(9,"/boot/apps/Pe/Pe")) then
-				system("/boot/apps/Pe/Pe '" + CurrentFile$ + "' &")
-			//One last place where it might be
-			elseif(open(9,"/boot/apps/Pe")) then
-				system("/boot/apps/Pe '" + CurrentFile$ + "' &")
-			else
-				alert "Pe not found in any standard location.", "OK", "warning"
-				close #9
-				break
-			endif
-			close #9	
+			if Backup <> 0 Backup()
+			SaveFile(CurrentFile$, 0 )
+			if FileExists("/boot/system/apps/Pe/Pe") system("/boot/system/apps/Pe/Pe '" + CurrentFile$ + "' &")
+			CloseWindow(1)
+			end
+			break
+		case "MenuView:File:Transfer...:to Kate":
+			if Backup <> 0 Backup()
+			SaveFile(CurrentFile$, 0)
+			if FileExists("/boot/system/apps/Kate/Kate") system("/boot/system/apps/Kate/Kate '" + CurrentFile$ + "' &")
+			CloseWindow(1)
+			end
+			break
+		case "MenuView:File:Transfer...:to Koder":
+			if Backup <> 0 Backup()
+			SaveFile(CurrentFile$, 0)
+			if FileExists("/boot/system/apps/Koder") system("/boot/system/apps/Koder '" + CurrentFile$ + "' &")
+			CloseWindow(1)
+			end
+			break
+		case "MenuView:File:Transfer...:to LibreOffice":
+			if Backup <> 0 Backup()
+			SaveFile(CurrentFile$, 0)
+			if FileExists("/boot/system/apps/LibreOffice/program/LibreOffice") system("/boot/system/apps/LibreOffice/program/LibreOffice '" + CurrentFile$ + "' &")
+			CloseWindow(1)
+			end
+			break
+		case "MenuView:File:Transfer...:to Calligra":
+			if Backup <> 0 Backup()
+			SaveFile(CurrentFile$, 0)
+			if FileExists("/boot/system/apps/Calligra/Words") system("/boot/system/apps/Calligra/Words '" + CurrentFile$ + "' &")
+			CloseWindow(1)
+			end
+			break
+		case "MenuView:File:Transfer...:to Notepadqq":
+			if Backup <> 0 Backup()
+			SaveFile(CurrentFile$, 0)
+			if FileExists("/boot/system/apps/Notepadqq/lib/notepadqq/Notepadqq") system("/boot/system/apps/Notepadqq/lib/notepadqq/Notepadqq '" + CurrentFile$ + "' &")
 			CloseWindow(1)
 			end
 			break
 		case "MenuView:File:Transfer...:to StyledEdit":
-			SaveFile(CurrentFile$)
-			//first try the post Alpha4.1 location
-			if(open(9,"/boot/system/apps/StyledEdit")) then
-				system("/boot/system/apps/StyledEdit '" + CurrentFile$ + "' &")
-			//now try the old location
-			elseif(open(9,"/boot/apps/StyledEdit")) then
-				system("/boot/apps/StyledEdit '" + CurrentFile$ + "' &")
-			else
-				alert "StyledEdit not found in any standard location.", "OK", "warning"
-				close #9
-				break
-			endif
-			close #9	
+			if Backup <> 0 Backup()
+			SaveFile(CurrentFile$, 0)
+			if FileExists("/boot/system/apps/StyledEdit") system("/boot/system/apps/StyledEdit '" + CurrentFile$ + "' &")
 			CloseWindow(1)
 			end
 			break
 		case "MenuView:File:Transfer...:to Rondel":
-			SaveFile(CurrentFile$)
-			system("/boot/system/apps/Rondel/Rondel '" + CurrentFile$ + "' &")
+			if Backup <> 0 Backup()
+			SaveFile(CurrentFile$, 0)
+			if FileExists("/boot/system/apps/Rondel/Rondel")system("/boot/system/apps/Rondel/Rondel '" + CurrentFile$ + "' &")
 			CloseWindow(1)
 			end
 			break
 		case "MenuView:File:Transfer...:to Trope":
-			SaveFile(CurrentFile$)
-			system("/boot/system/apps/Trope/Trope '" + CurrentFile$ + "' &")
+			if Backup <> 0 Backup()
+			SaveFile(CurrentFile$, 0)
+			if FileExists("/boot/system/apps/Trope/Trope") system("/boot/system/apps/Trope/Trope '" + CurrentFile$ + "' &")
 			CloseWindow(1)
 			end
 			break
@@ -2385,7 +2596,7 @@ sub TropeHelpLoop(Command$)
 			InstallLanguagePack("pack3")
 			break
 		case "MenuView:Help:About":
-			Alert AppName$ + " " + AppVersion$ + "\nby Michel Clasquin-Johnson\nPublic Domain Software, 2014\n\nWith thanks to Lelldorin for his help on the Find function, and to Rene Gollent, bbjimmy and Humdinger for help with identifying file types.\n\nThis product includes freeware toolbar icons from\nhttp://hongkiat.com/blog/toolbar-icon-set/","OK","info"
+			Alert AppName$ + " " + AppVersion$ + "\nby Michel Clasquin-Johnson\nMIT-Licensed Software, 2019\n\nWith thanks to Lelldorin for his help on the Find function, and to Rene Gollent, bbjimmy and Humdinger for help with identifying file types.\n\nThis product includes toolbar icons from\nhttp://hongkiat.com/blog/toolbar-icon-set/\n and the Lorem utility by Per Erik Strandberg (distributed under the GNU GPL3)","OK","info"
 			break
 		default
 			break
@@ -2401,7 +2612,7 @@ sub TropeSettingsLoop(Command$)
 			submenu set "Settings", "Word Wrap", "Re-Wrap", "enable", "MenuView"
 			WordWrap = 1
 			textedit set "EditBox", "wordwrap", WordWrap
-			SaveSettings()
+			SaveSettings(0)
 			break
 		case "MenuView:Settings:Word Wrap:Off":
 			submenu set "Settings", "Word Wrap", "Off", "disable", "MenuView"
@@ -2409,7 +2620,7 @@ sub TropeSettingsLoop(Command$)
 			submenu set "Settings", "Word Wrap", "Re-Wrap", "disable", "MenuView"
 			WordWrap = 0
 			textedit set "EditBox", "wordwrap", WordWrap
-			SaveSettings()
+			SaveSettings(0)
 			break
 		case "MenuView:Settings:Word Wrap:Re-Wrap":
 			textedit set "EditBox", "wordwrap", 0
@@ -2424,42 +2635,45 @@ sub TropeSettingsLoop(Command$)
 			submenu set "Settings", "Backup", "On", "disable", "MenuView"
 			submenu set "Settings", "Backup", "Off", "enable", "MenuView"
 			Backup = 1
-			SaveSettings()
+			SaveSettings(0)
 			break
 		case "MenuView:Settings:Backup:Off":
 			submenu set "Settings", "Backup", "Off", "disable", "MenuView"
 			submenu set "Settings", "Backup", "On", "enable", "MenuView"
 			Backup = 0
-			SaveSettings()
+			SaveSettings(0)
 			break
 		case "MenuView:Settings:Toolbar:Graphics On":
 			TropeToolbarOverlay()
 			submenu set "Settings", "Toolbar", "Graphics On", "disable", "MenuView"
 			submenu set "Settings", "Toolbar", "Graphics Off", "enable", "MenuView"
 			Toolbar = 1
-			SaveSettings()
+			SaveSettings(0)
 			break
 		case "MenuView:Settings:Toolbar:Graphics Off":
 			if view get "ToolbarOverlay", "exists" = 1 view remove "ToolbarOverlay"
 			submenu set "Settings", "Toolbar", "Graphics Off", "disable", "MenuView"
 			submenu set "Settings", "Toolbar", "Graphics On", "enable", "MenuView"
 			Toolbar = 0
-			SaveSettings()
+			SaveSettings(0)
 			break
-		case "MenuView:Settings:Language:Assist ON":
-			submenu set "Settings", "Language", "Assist ON", "disable", "MenuView"
-			submenu set "Settings", "Language", "Assist OFF", "enable", "MenuView"
+		case "MenuView:Settings:Autosuggest:Assist ON":
+			submenu set "Settings", "Autosuggest", "Assist ON", "disable", "MenuView"
+			submenu set "Settings", "Autosuggest", "Assist OFF", "enable", "MenuView"
 			textedit set "EditBox", "has-autocompletion", 1
-			textedit set "EditBox", "autocomplete-start", 3
+			textedit set "EditBox", "autocomplete-start", 2
 			autocomplete=1
 			ChangeTitleBar()
 			break
-		case "MenuView:Settings:Language:Assist OFF":
-			submenu set "Settings", "Language", "Assist OFF", "disable", "MenuView"
-			submenu set "Settings", "Language", "Assist ON", "enable", "MenuView"
+		case "MenuView:Settings:Autosuggest:Assist OFF":
+			submenu set "Settings", "Autosuggest", "Assist OFF", "disable", "MenuView"
+			submenu set "Settings", "Autosuggest", "Assist ON", "enable", "MenuView"
 			textedit set "EditBox", "has-autocompletion", 0
 			autocomplete=0
 			ChangeTitleBar()
+			break
+		case "MenuView:Settings:Autosuggest:Edit User's word list"
+			system("/boot/system/apps/StyledEdit " + SettingsDir$ + GetAspellAbbr$() + " &")
 			break
 		default
 			break
@@ -5336,21 +5550,617 @@ data 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216
 data 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216
 data 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216, 216
 
+label Loremdata
+//used to generate a local copy of the LOREM utility
+DATA "#!/bin/python"
+DATA "# -*- coding: utf-8 -*-"
+DATA ""
+DATA "\"\"\""
+DATA "A lorem ipsum generator for the terminal."
+DATA ""
+DATA "Run lorem -h for more details."
+DATA ""
+DATA "Download and read more at"
+DATA " * https://github.com/per9000"
+DATA " * http://www.pererikstrandberg.se/blog/index.cgi?page=LoremIpsumGenerator"
+DATA ""
+DATA "\"\"\""
+DATA ""
+DATA "# Copyright 2014 Per Erik Strandberg: <per9000 at gmail dot com>"
+DATA "#"
+DATA "# This program is free software you can redistribute it and/or modify"
+DATA "# it under the terms of the GNU General Public License as published by"
+DATA "# the Free Software Foundation either version 3 of the License, or"
+DATA "# (at your option) any later version."
+DATA "#"
+DATA "# This program is distributed in the hope that it will be useful,"
+DATA "# but WITHOUT ANY WARRANTY without even the implied warranty of"
+DATA "# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the"
+DATA "# GNU General Public License for more details."
+DATA "#"
+DATA "# You should have received a copy of the GNU General Public License"
+DATA "# along with this program if not, write to the Free Software"
+DATA "# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,"
+DATA "# MA 02110-1301, USA."
+DATA ""
+DATA "# Thanks to"
+DATA "#  * Barre, for the n overflow solution"
+DATA "#  * http://lipsum.sourceforge.net/whatis.php for source lorems and inspiration"
+DATA "#    (of initial lorem implementation)"
+DATA "#  * The EMACS spook function"
+DATA ""
+DATA "from argparse import ArgumentParser"
+DATA "from random import shuffle, choice"
+DATA "from textwrap import fill"
+DATA ""
+DATA "SHORTNAME = \"lorem\""
+DATA "PROGRAM = \"Lorem Ipsum Generator (%s)\" % SHORTNAME"
+DATA "VERSION = \"0.7.4\""
+DATA "COPYR = \"Copyright (C) 2014 Per Erik Strandberg\""
+DATA "GPLV3 = \"\"\"This is free software, and you are welcome to redistribute it"
+DATA "under the GNU General Public License 3+ <http://www.gnu.org/licenses/gpl.html>"
+DATA "%s comes with NO WARRANTY, to the extent permitted by law.\"\"\" % SHORTNAME"
+DATA ""
+DATA ""
+DATA "def get_quote(source=None, idx=None):"
+DATA "    \"\"\"Get a quote\"\"\""
+DATA "    i = 0"
+DATA ""
+DATA "    if source in ['cicero', 'lorem'] or idx == i:"
+DATA "        # http://en.wikisource.org/wiki/Lorem_ipsum"
+DATA "        # De finibus bonorum et malorum, by Marcus Tullius Cicero, 45 BCE"
+DATA "        return \"\"\"Lorem ipsum dolor sit amet, consectetuer adipiscing"
+DATA "        elit. Aenean commodo ligula eget dolor. Aenean massa. Cum"
+DATA "        sociis natoque penatibus et magnis dis parturient montes,"
+DATA "        nascetur ridiculus mus. Donec quam felis, ultricies nec,"
+DATA "        pellentesque eu, pretium quis, sem. Nulla consequat massa quis"
+DATA "        enim. Donec pede justo, fringilla vel, aliquet nec, vulputate"
+DATA "        eget, arcu. In enim justo, rhoncus ut, imperdiet a, venenatis"
+DATA "        vitae, justo. Nullam dictum felis eu pede mollis"
+DATA "        pretium. Integer tincidunt. Cras dapibus. Vivamus elementum"
+DATA "        semper nisi. Aenean vulputate eleifend tellus. Aenean leo"
+DATA "        ligula, porttitor eu, consequat vitae, eleifend ac,"
+DATA "        enim. Aliquam lorem ante, dapibus in, viverra quis, feugiat a,"
+DATA "        tellus. Phasellus viverra nulla ut metus varius"
+DATA "        laoreet. Quisque rutrum. Aenean imperdiet. Etiam ultricies"
+DATA "        nisi vel augue. Curabitur ullamcorper ultricies nisi. Nam eget"
+DATA "        dui.\"\"\""
+DATA ""
+DATA "    i += 1"
+DATA "    if source in ['boccaccio', 'decameron', 'decamerone'] or idx == i:"
+DATA "        # http://it.wikisource.org/wiki/Decameron/1a_giornata/Novella_Prima"
+DATA "        # The Decameron, by Giovanni Boccaccio, 1340-1350"
+DATA "        return \"\"\"Ser Cepperello con una falsa confessione inganna uno"
+DATA "        santo frate, e muorsi; ed essendo stato un pessimo uomo in"
+DATA "        vita, è morto reputato per santo e chiamato san Ciappelletto."
+DATA "        Convenevole cosa è, carissime donne, che ciascheduna cosa la"
+DATA "        quale l’uomo fa, dallo ammirabile e santo nome di Colui il"
+DATA "        quale di tutte fu facitore le dea principio. Per che, dovendo"
+DATA "        io al nostro novellare, sì come primo, dare cominciamento,"
+DATA "        intendo da una delle sue maravigliose cose incominciare, acciò"
+DATA "        che, quella udita, la nostra speranza in lui, sì come in cosa"
+DATA "        impermutabile, si fermi e sempre sia da noi il suo nome"
+DATA "        lodato.  Manifesta cosa è che, sì come le cose temporali tutte"
+DATA "        sono transitorie e mortali, così in sé e fuor di sé essere"
+DATA "        piene di noia e d’angoscia e di fatica e ad infiniti pericoli"
+DATA "        soggiacere; alle quali senza niuno fallo né potremmo noi, che"
+DATA "        viviamo mescolati in esse e che siamo parte d’esse, durare né"
+DATA "        ripararci, se spezial grazia di Dio forza e avvedimento non ci"
+DATA "        prestasse. La quale a noi e in noi non è da credere che per"
+DATA "        alcuno nostro merito discenda, ma dalla sua propia benignità"
+DATA "        mossa e da prieghi di coloro impetrata che, sì come noi siamo,"
+DATA "        furon mortali, e bene i suoi piaceri mentre furono in vita"
+DATA "        seguendo, ora con lui etterni sono divenuti e beati; alli"
+DATA "        quali noi medesimi, sì come a procuratori informati per"
+DATA "        esperienza della nostra fragilità, forse non audaci di porgere"
+DATA "        i prieghi nostri nel cospetto di tanto giudice, delle cose le"
+DATA "        quali a noi reputiamo opportune gli porgiamo.\"\"\""
+DATA ""
+DATA "    i += 1"
+DATA "    if source in ['goethe', 'faust'] or idx == i:"
+DATA "        # Faust - Der Tragödie erster Teil, by Johann Wolfgang von Goethe, 1808"
+DATA "        # http://de.wikisource.org/wiki/Faust_-_Der_Trag%C3%B6die_erster_Teil"
+DATA "        return \"\"\"Ihr naht euch wieder, schwankende Gestalten!  Die"
+DATA "        früh sich einst dem trüben Blick gezeigt. Versuch’ ich wohl"
+DATA "        euch diesmal fest zu halten? Fühl’ ich mein Herz noch jenem"
+DATA "        Wahn geneigt? Ihr drängt euch zu! nun gut, so mögt ihr"
+DATA "        walten. Wie ihr aus Dunst und Nebel um mich steigt. Mein Busen"
+DATA "        fühlt sich jugendlich erschüttert. Vom Zauberhauch der euren"
+DATA "        Zug umwittert. Ihr bringt mit euch die Bilder froher Tage. Und"
+DATA "        manche liebe Schatten steigen auf Gleich einer alten,"
+DATA "        halbverklungnen Sage. Kommt erste Lieb’ und Freundschaft mit"
+DATA "        herauf Der Schmerz wird neu, es wiederholt die Klage. Des"
+DATA "        Lebens labyrinthisch irren Lauf, Und nennt die Guten, die, um"
+DATA "        schöne Stunden Vom Glück getäuscht, vor mir"
+DATA "        hinweggeschwunden.\"\"\""
+DATA ""
+DATA "    i += 1"
+DATA "    if source in ['beaudelaire', 'flowers', 'fleurs'] or idx == i:"
+DATA "        # http://fr.wikisource.org/wiki/Les_Fleurs_du_mal/1857"
+DATA "        # Les Fleurs du mal, by Charles Baudelaire, 1857"
+DATA "        return \"\"\"Lorsque, par un décret des puissances suprêmes, Le"
+DATA "        Poète apparaît en ce monde ennuyé, Sa mère épouvantée et"
+DATA "        pleine de blasphèmes Crispe ses poings vers Dieu qui la prend"
+DATA "        en pitié. Ah! Que n' ai je mis bas tout un nœud de vipères,"
+DATA "        Plutôt que de nourrir cette dérision! Maudite soit la nuit"
+DATA "        aux plaisirs éphémères Où mon ventre a conçu mon expiation!"
+DATA "        Puisque tu m’as choisie entre toutes les femmes Pour être le"
+DATA "        dégoût de mon triste mari. Et que je ne puis pas rejeter dans"
+DATA "        les flammes, Comme un billet d’amour, ce monstre rabougri. Je"
+DATA "        ferai rejaillir ta haine qui m’accable Sur l’instrument maudit"
+DATA "        de tes méchancetés, Et je tordrai si bien cet arbre misérable"
+DATA "        Qu’il ne pourra pousser ses boutons empestés!\"\"\""
+DATA ""
+DATA "    i += 1"
+DATA "    if source in ['strindberg', 'hemsöborna', 'hemsoborna'] or idx == i:"
+DATA "        # http://runeberg.org/strindbg/hemsobor/"
+DATA "        # Hemsöborna by August Strindberg, 1914"
+DATA "        return \"\"\"Han kom som ett yrväder en aprilafton och hade ett"
+DATA "        höganäskrus i en svångrem om halsen. Clara och Lotten voro"
+DATA "        inne med skötekan att hämta honom på Dalarö brygga; men det"
+DATA "        dröjde evigheter, innan de kommo i båt. De skulle till"
+DATA "        handelsman och ha en tunna tjära och på abeteket och hämta"
+DATA "        gråsalva åt grisen, och så skulle de på posten och få ett"
+DATA "        frimärke, och så skulle de ner till Fia Lövström i Kroken och"
+DATA "        låna tuppen mot ett halvpund småtärna till notbygget, och sist"
+DATA "        hade de hamnat på gästgivaregården, där Carlsson bjudit på"
+DATA "        kaffe med dopp. Och så kommo de äntligen i båt, men Carlsson"
+DATA "        ville styra, och det kunde han inte, för han hade aldrig sett"
+DATA "        en råseglare förr, och därför skrek han, att de skulle hissa"
+DATA "        focken, som inte fanns. Och på tullbryggan stodo lotsar och"
+DATA "        vaktmästare och grinade åt manövern, när ekan gick över stag"
+DATA "        och länsade ner åt Saltsäcken. Hörru, du har hål i båten!"
+DATA "        skrek en lotslärling genom vinden; Stopp till! stopp till!"
+DATA "        och medan Carlsson tittade efter hålen, hade Clara knuffat"
+DATA "        undan honom och tagit roret, och med årorna lyckades Lotten få"
+DATA "        ekan opp i vinden igen, så att nu strök det ner åt Aspösund"
+DATA "        med god gång. Carlsson var en liten fyrkantig värmländing med"
+DATA "        blå ögon och näsa krokig som en syskonhake. Livlig, lekfull"
+DATA "        och nyfiken var han, men sjöaffärerna förstod han inte alls,"
+DATA "        och han var också kallad ut till Hemsö för att ta hand om åker"
+DATA "        och kreatur, som ingen annan ville ta befattning med, sedan"
+DATA "        gubben Flod gått ur livet och änkan satt ensam vid gården. Men"
+DATA "        när Carlsson nu ville börja pumpa flickorna om ställningar och"
+DATA "        förhållanden, så fick han riktiga skärkarlssvar. Ja si, det"
+DATA "        vet jag inte! Ja si, det kan jag inte säga! Ja si, det vet jag"
+DATA "        rakt inte.\"\"\""
+DATA ""
+DATA "    i += 1"
+DATA "    if source in ['poe', 'raven'] or idx == i:"
+DATA "        # http://en.wikisource.org/wiki/The_Raven_and_Other_Poems/The_Raven"
+DATA "        # The Raven by Edgar Allan Poe, 1845"
+DATA "        return \"\"\"Once upon a midnight dreary, while I pondered, weak"
+DATA "        and weary. Over many a quaint and curious volume of forgotten"
+DATA "        lore.  While I nodded, nearly napping, suddenly there came a"
+DATA "        tapping.  As of some one gently rapping, rapping at my chamber"
+DATA "        door.  'Tis some visiter, I muttered, tapping at my chamber"
+DATA "        door.  Only this, and nothing more. Ah, distinctly I remember"
+DATA "        it was in the bleak December. And each separate dying ember"
+DATA "        wrought its ghost upon the floor.  Eagerly I wished the"
+DATA "        morrow;—vainly I had sought to borrow. From my books surcease"
+DATA "        of sorrow—sorrow for the lost Lenore. For the rare and radiant"
+DATA "        maiden whom the angels name Lenore. Nameless here for"
+DATA "        evermore.  And the silken sad uncertain rustling of each"
+DATA "        purple curtain Thrilled me, filled me with fantastic terrors"
+DATA "        never felt before; So that now, to still the beating of my"
+DATA "        heart, I stood repeating Tis some visiter entreating entrance"
+DATA "        at my chamber door.  Some late visiter entreating entrance at"
+DATA "        my chamber door.  This it is, and nothing more.  Presently my"
+DATA "        soul grew stronger; hesitating then no longer.  Sir, said I,"
+DATA "        or Madam, truly your forgiveness I implore.  But the fact is I"
+DATA "        was napping, and so gently you came rapping, And so faintly"
+DATA "        you came tapping, tapping at my chamber door.  That I scarce"
+DATA "        was sure I heard you, here I opened wide the door.  Darkness"
+DATA "        there, and nothing more.  Deep into that darkness peering,"
+DATA "        long I stood there wondering, fearing.  Doubting, dreaming"
+DATA "        dreams no mortal ever dared to dream before; But the silence"
+DATA "        was unbroken, and the darkness gave no token.  And the only"
+DATA "        word there spoken was the whispered word, Lenore!  This I"
+DATA "        whispered, and an echo murmured back the word, Lenore!  Merely"
+DATA "        this, and nothing more.\"\"\""
+DATA ""
+DATA "    i += 1"
+DATA "    if source in ['strandberg', 'foo'] or idx == i:"
+DATA "        # I made this up - hereby donated to the public domain"
+DATA "        # Foo Bar Baz, by Per Erik Strandberg, 2014"
+DATA "        return \"\"\"Foo. Foo hoo? Foo bar. Foo bar, baz. Baz? Foo bar, baz.\"\"\""
+DATA ""
+DATA "    i += 1"
+DATA "    if source in ['bible', 'genesis'] or idx == i:"
+DATA "        # https://en.wikisource.org/wiki/Bible_%28Wikisource%29/Genesis"
+DATA "        # Genesis, by Moses (yeah, right!), 6th and 5th centuries BCE"
+DATA "        return \"\"\"At first, God created the sky, and the Earth. And"
+DATA "        the Earth was helter skelter, and darkness upon the abyss,"
+DATA "        God's spirit drifting upon the surface of the water. And God"
+DATA "        said, Light will be, and light was. And God saw this light was"
+DATA "        good, and God separated the light from the darkness. And God"
+DATA "        called the light day, and called the darkness night; and it"
+DATA "        was evening, and it was morning, day one. And God said, A dome"
+DATA "        will be inside the waters, and it will make a divide between"
+DATA "        water and water. And God made the dome, and divided the water"
+DATA "        which was under the dome from the water which was above the"
+DATA "        dome; and it was so. And God called the dome sky. And it was"
+DATA "        evening and it was morning, day two. And God said, the waters"
+DATA "        below the sky will drain to one place, and the dry land will"
+DATA "        show; and it was so. And God called the dry land land, and the"
+DATA "        pool of water he called seas. And God saw it was good. And God"
+DATA "        said, engrassed will be the Earth with grass plants sowing"
+DATA "        seeds, fruit trees making fruit of its kind, with its seed"
+DATA "        inside, on the Earth, and it was so. And the land sprouted"
+DATA "        seeded grasses, plants sowing seeds, of their kind, and trees"
+DATA "        making fruit with their seed inside; and God saw it was"
+DATA "        good. And it was evening and it was morning, day three. And"
+DATA "        God said, there will be lights in the dome of the sky, to"
+DATA "        distinguish between the night and the day; and they will be"
+DATA "        for signs and for seasons, for days, and years. And it was for"
+DATA "        the lights in the dome of the sky to light up the Earth, and"
+DATA "        it was so. And God made, the two great lights: the big light,"
+DATA "        to govern the day, and the small light to govern the night,"
+DATA "        and the stars. And God gave them, in the dome of the sky, to"
+DATA "        light up the Earth. And to govern, the day and night, and to"
+DATA "        separate between the light and the darkness; and God saw that"
+DATA "        it was good. And it was evening, and it was morning, day"
+DATA "        four. And God said, the waters will infest with forms of"
+DATA "        living spirit, and fowl will fly above the land, on the"
+DATA "        surface of the dome of the sky., And God created the big"
+DATA "        crocodiles, and all the living beings that roam, which teemed"
+DATA "        the water with their own kind, and every bird of a feather to"
+DATA "        its kind, and God saw that it was good. And God blessed them,"
+DATA "        saying: Bear fruit and multiply, and fill the water in the"
+DATA "        seas and the bird, will multiply on the land. And it was"
+DATA "        evening and it was morning, day five. And God said, out of"
+DATA "        the land will come out living beings of their kind, beasts and"
+DATA "        crawlers, and land animals, to their kind; And it was so. And"
+DATA "        God made the land animal into its kind, and the beast to its"
+DATA "        own kind, and the crawler of the land to its own kind; and God"
+DATA "        saw that it was good. And God said, we will make man in our"
+DATA "        image, in our likeness. And they will oversee the fish of the"
+DATA "        sea and the bird in the sky, and the beast, and all the Earth,"
+DATA "        and all the crawlers that crawl upon the Earth. And God"
+DATA "        created the man in his image, in the image of God created him:"
+DATA "        male and female, created them. And God blessed them, and God"
+DATA "        told them bear fruit and multiply and fill up the Earth, and"
+DATA "        conquer it, and oversee the fish in the sea, and the bird in"
+DATA "        the sky, and every animal which crawls upon the Earth.\"\"\""
+DATA ""
+DATA "    i += 1"
+DATA "    if source in ['walden', 'thoreau'] or idx == i:"
+DATA "        # https://en.wikisource.org/wiki/Walden/Chapter_II"
+DATA "        # Walden (II: Where I Lived, and What I Lived For),"
+DATA "        # by Henry David Thoreau, 1854"
+DATA "        return \"\"\"I went to the woods because I wished to live deliberately,"
+DATA "        to front only the essential facts of life, and see if I"
+DATA "        could not learn what it had to teach, and not, when I came"
+DATA "        to die, discover that I had not lived. I did not wish to"
+DATA "        live what was not life, living is so dear; nor did I wish to"
+DATA "        practise resignation, unless it was quite necessary. I"
+DATA "        wanted to live deep and suck out all the marrow of life, to"
+DATA "        live so sturdily and Spartan like as to put to rout all that"
+DATA "        was not life, to cut a broad swath and shave close, to drive"
+DATA "        life into a corner, and reduce it to its lowest terms, and,"
+DATA "        if it proved to be mean, why then to get the whole and"
+DATA "        genuine meanness of it, and publish its meanness to the"
+DATA "        world; or if it were sublime, to know it by experience, and"
+DATA "        be able to give a true account of it in my next excursion."
+DATA "        For most men, it appears to me, are in a strange uncertainty"
+DATA "        about it, whether it is of the devil or of God, and have"
+DATA "        somewhat hastily concluded that it is the chief end of man"
+DATA "        here to glorify God and enjoy him forever. Still we live"
+DATA "        meanly, like ants; though the fable tells us that we were"
+DATA "        long ago changed into men; like pygmies we fight with"
+DATA "        cranes; it is error upon error, and clout upon clout, and"
+DATA "        our best virtue has for its occasion a superfluous and"
+DATA "        evitable wretchedness. Our life is frittered away by detail."
+DATA "        An honest man has hardly need to count more than his ten"
+DATA "        fingers, or in extreme cases he may add his ten toes, and"
+DATA "        lump the rest. Simplicity, simplicity, simplicity! I say,"
+DATA "        let your affairs be as two or three, and not a hundred or a"
+DATA "        thousand; instead of a million count half a dozen, and keep"
+DATA "        your accounts on your thumbnail. In the midst of this"
+DATA "        chopping sea of civilized life, such are the clouds and"
+DATA "        storms and quicksands and thousand and one items to be"
+DATA "        allowed for, that a man has to live, if he would not founder"
+DATA "        and go to the bottom and not make his port at all, by dead"
+DATA "        reckoning, and he must be a great calculator indeed who"
+DATA "        succeeds. Simplify, simplify. Instead of three meals a day,"
+DATA "        if it be necessary eat but one; instead of a hundred dishes,"
+DATA "        five; and reduce other things in proportion.\"\"\""
+DATA ""
+DATA "    # output from the emacs spook function"
+DATA "    # http://www.gnu.org/software/emacs/manual/html_node/emacs/Mail-Amusements.html"
+DATA "    return \"\"\"Asset csystems BATF Blowpipe Soviet South Africa wire"
+DATA "    transfer. NSA event security Compsec spies benelux Sears Tower"
+DATA "    airframe red noise. Commecen Steve Case SCUD missile Kosovo"
+DATA "    quarter bce Bellcore SAPO. Asset IRA TWA rail gun CDMA embassy"
+DATA "    USCODE. Bin Laden analyzer S Key ASIO espionage South Africa"
+DATA "    Ermes ASDIC NASA. MP5KSD Etacs plutonium Putin Tony Blair"
+DATA "    corporate security. Telex ANDVT MD5 kilderkin Comirex strategic"
+DATA "    AIMSX Hugo Chavez Rubin. Medco PGP asset EuroFed Area 51 64"
+DATA "    Vauxhall Cross. Yukon Gazprom Crypto AG quiche secure COSCO"
+DATA "    Belknap Elvis MD5 KH11. MD2 PGP Nazi Abu Ghraib Lon Horiuchi."
+DATA "    Crowell Treasury pink noise strategic LLNL airframe embassy"
+DATA "    AK47. Mafia Forte ebomb quarter Dateline kibo Janet Reno."
+DATA "    Reno Bellcore kibo AVN NATO counter terrorism Downing Street"
+DATA "    Kennedy. ANZUS Merlin Dick Cheney Janet Reno doctrine Albanian"
+DATA "    AFSPC. David John Oates event security csim Ft. Knox Forte crypto"
+DATA "    anarchy spy. Nuclear PLO basement MILSATCOM genetic 9/11 PET"
+DATA "    Crypto AG. Freeh Bellcore unclassified. Hello to all my friends"
+DATA "    and fans in domestic surveillance. Saudi Arabia Panama secure"
+DATA "    EuroFed Glock17 Bush. Wired Marxist preemptive FBI Europol"
+DATA "    embassy. Heartbleed MD5 tempest offensive information warfare."
+DATA "    Bosnia NWO CIDA SAFE colonel dictionary Security Council Bruxelles."
+DATA "    ASLET Aldergrove pipeline 9/11 UMTS fundamentalist MD2 Etacs Agfa."
+DATA "    keyhole DES PGP fraud csystems Israel Islam Abduganievich Karimov."
+DATA "    ANZUS ARPA Bin Laden David John Oates analyzer keyhole FSF PLO."
+DATA "    Audiotel Capricorn satellite imagery fundamentalist DRM FBI."
+DATA "    broadside MD2 covert video Firewalls Telex munitions John Kerry."
+DATA "    SRI Abu Ghraib Glock BRLO STANAG SEAL Team 6 Janet Reno event."
+DATA "    security Mole digicash Sears Tower Reno 9/11 Crypto AG nitrate."
+DATA "    radar computer terrorism doctrine United Nations ASPIC colonel"
+DATA "    22nd. SAS supercomputer espionage passwd Waco, Texas kibo Fedayeen."
+DATA "    Mahmoud Ahmadinejad supercomputer Bush Wired eternity server."
+DATA "    Guantanamo INS plutonium Semtex advisors. S Box Chobetsu 556."
+DATA "    A csystems illuminati offensive information warfare cracking sniper."
+DATA "    Monarchist Agfa Al Jazeera. Mole ICE AlQaeda John Kerry JUWTF."
+DATA "    Number key AIMSX Taiwan. Plutonium 9/11 Gazprom Ruby Ridge benelux."
+DATA "    Corporate security clones cybercash Etacs computer terrorism."
+DATA "    Number key cryptographic industrial espionage SSL subversive"
+DATA "    Bernadotte fundamentalist. Hollow point. Let's talk about roses.\"\"\""
+DATA ""
+DATA ""
+DATA "def parse_args(arguments=None):"
+DATA "    \"\"\""
+DATA "    Parse command line argumets, or the given string"
+DATA "        >>> opt = parse_args(['-n', '3'])"
+DATA "        >>> opt.words == 3"
+DATA "        True"
+DATA "    \"\"\""
+DATA "    desc = \"%s - Create more or less random lorem ipsum text.\" % SHORTNAME"
+DATA "    vinfo = \"%s version %s\\n\\n%s\\n\\n%s\" % (PROGRAM, VERSION, COPYR, GPLV3)"
+DATA ""
+DATA "    parser = ArgumentParser(description=desc)"
+DATA "    parser.add_argument('-v', '--version', action='store_const',"
+DATA "                        help=\"show program's version number and exit\","
+DATA "                        const=vinfo)"
+DATA "    parser.add_argument('-t', action='store_true',"
+DATA "                        help='run self-tests and exit')"
+DATA "    parser.add_argument('--cols', action='store', type=int, metavar='COLS',"
+DATA "                        default=80, help='override line width - default 80')"
+DATA ""
+DATA "    ogroup = parser.add_argument_group('output format (mutually exclusive)')"
+DATA "    ogroup.add_argument('--words', '-n', action='store', type=int, metavar='N',"
+DATA "                        help='number of words')"
+DATA "    ogroup.add_argument('--sentences', '-s', action='store', type=int,"
+DATA "                        metavar='S', help='number of sentences')"
+DATA "    ogroup.add_argument('--lines', '-l', action='store', type=int, metavar='L',"
+DATA "                        help='number of lines')"
+DATA "    ogroup.add_argument('--chars', '-c', action='store', type=int, metavar='C',"
+DATA "                        help='number of characters (excl. final newline)')"
+DATA ""
+DATA "    qgroup = parser.add_argument_group('qoute selection')"
+DATA "    qgroup.add_argument('--lorem', '--cicero', action='store_const',"
+DATA "                        const='lorem', dest='source', default='lorem',"
+DATA "                        help='\"Lorem ipsum dolor sit amet...\"')"
+DATA "    qgroup.add_argument('--decamerone', '--boccaccio', dest='source',"
+DATA "                        action='store_const', const='decamerone',"
+DATA "                        help='\"Ser Cepperello con una falsa confessione...\"')"
+DATA "    qgroup.add_argument('--faust', '--goethe', action='store_const',"
+DATA "                        const='faust', dest='source',"
+DATA "                        help='\"Ihr naht euch wieder...\"')"
+DATA "    qgroup.add_argument('--fleurs', '--beaudelaire', dest='source',"
+DATA "                        action='store_const', const='fleurs',"
+DATA "                        help='\"Lorsque, par un décret...\"')"
+DATA "    qgroup.add_argument('--strindberg', '--hemsöborna', dest='source',"
+DATA "                        action='store_const', const='strindberg',"
+DATA "                        help='\"Han kom som ett yrväder en aprilafton...\"')"
+DATA "    qgroup.add_argument('--spook', '--emacs', dest='source',"
+DATA "                        action='store_const', const='spook',"
+DATA "                        help='\"Asset csystems BATF Blowpipe Soviet...\"')"
+DATA "    qgroup.add_argument('--poe', '--raven', dest='source',"
+DATA "                        action='store_const', const='raven',"
+DATA "                        help='\"Once upon a midnight dreary, while I pondered' +"
+DATA "                        ', weak and weary,...\"')"
+DATA "    qgroup.add_argument('--strandberg', '--foo', dest='source',"
+DATA "                        action='store_const', const='strandberg',"
+DATA "                        help='\"Foo. Foo hoo? Foo bar. Foo bar, baz...\"')"
+DATA "    qgroup.add_argument('--bible', '--genesis', dest='source',"
+DATA "                        action='store_const', const='bible',"
+DATA "                        help='\"At first, God created the sky, and...\"')"
+DATA "    qgroup.add_argument('--walden', '--thoreau', dest='source',"
+DATA "                        action='store_const', const='walden',"
+DATA "                        help='\"I went to the woods...\"')"
+DATA "    qgroup.add_argument('-q', '--quote', action='store', type=int, metavar='Q',"
+DATA "                        help='select source by index instead, q = 1, 2, ...')"
+DATA ""
+DATA "    sgroup = parser.add_argument_group('options for sentences')"
+DATA "    sgroup.add_argument('--lower', action='store_const', dest='case',"
+DATA "                        const='lower', default=None,"
+DATA "                        help='all lower case (default false)')"
+DATA "    sgroup.add_argument('--upper', action='store_const', dest='case',"
+DATA "                        const='upper', default=None,"
+DATA "                        help='all upper case (default false)')"
+DATA "    sgroup.add_argument('--randomize', action='store_true',"
+DATA "                        help='randomize order (default false)')"
+DATA ""
+DATA "    if arguments:"
+DATA "        opt = parser.parse_args(arguments)"
+DATA "    else:"
+DATA "        opt = parser.parse_args()"
+DATA "    check_args(parser, opt)"
+DATA "    return opt"
+DATA ""
+DATA ""
+DATA "def check_args(parser, opt):"
+DATA "    \"\"\"Raise parser.error if needed or not.\"\"\""
+DATA "    if opt.chars is None and opt.words is None and opt.lines is None and opt.sentences is None:"
+DATA "        opt.words = 5"
+DATA ""
+DATA "    for arg in [opt.chars, opt.words, opt.lines, opt.sentences]:"
+DATA "        if arg is not None and arg < 0:"
+DATA "            parser.error(\"Only non-negative values are allowed.\")"
+DATA ""
+DATA "    if sum([bool(arg is not None) for arg in [opt.chars, opt.words, opt.lines,"
+DATA "                                              opt.sentences]]) > 1:"
+DATA "        parser.error(\"Use only one of chars, words, lines or sentences.\")"
+DATA "    return"
+DATA ""
+DATA ""
+DATA "def randomize(lorem):"
+DATA "    \"\"\"Randomize the order of the lorem.\"\"\""
+DATA "    words = lorem.split(' ')"
+DATA "    shuffle(words)"
+DATA "    words[0] = words[0][0].upper() + words[0][1:]"
+DATA "    return ' '.join(words)"
+DATA ""
+DATA ""
+DATA "def do_case(lorem, case):"
+DATA "    \"\"\"Set upper or lower case, or do nothing\"\"\""
+DATA "    if case == 'upper':"
+DATA "        return lorem.upper()"
+DATA "    elif case == 'lower':"
+DATA "        return lorem.lower()"
+DATA "    return lorem"
+DATA ""
+DATA ""
+DATA "def no_linebreaks(lorem):"
+DATA "    \"\"\"Remove the new line chars.\"\"\""
+DATA "    lorem = lorem.replace('\\n', ' ')"
+DATA "    lorem = lorem.replace('  ', ' ')"
+DATA "    lorem = lorem.replace('  ', ' ')"
+DATA "    return lorem"
+DATA ""
+DATA ""
+DATA "def get_sentences(lorem, n):"
+DATA "    \"\"\"Get n sentences\"\"\""
+DATA "    lorem = no_linebreaks(lorem)"
+DATA ""
+DATA "    m = 0"
+DATA "    seps = ['.', ';', '!', '?']"
+DATA "    for sep in seps:"
+DATA "        lorem = lorem.replace(sep, '|')"
+DATA "    sentences = lorem.split('|')[:-1]"
+DATA ""
+DATA "    output = list()"
+DATA "    while (m < n) and ((n-m) > len(sentences)):"
+DATA "        output += sentences"
+DATA "        m += len(sentences)"
+DATA ""
+DATA "    output += sentences[0:n-m]"
+DATA ""
+DATA "    lorem = \"\""
+DATA "    for sentence in output:"
+DATA "        sentence = sentence.strip()"
+DATA "        lorem += sentence[0].upper() + sentence[1:] + choice(seps) + \" \""
+DATA "    lorem = lorem.rstrip()"
+DATA "    return lorem"
+DATA ""
+DATA ""
+DATA "def get_lines(lorem, n):"
+DATA "    \"\"\"Get n lines\"\"\""
+DATA ""
+DATA "    lorem = lorem.replace('\\n\\n', '\\n')"
+DATA "    lines = lorem.split('\\n')"
+DATA "    m = 0"
+DATA ""
+DATA "    output = list()"
+DATA "    while (m < n) and ((n-m) > len(lines)):"
+DATA "        output += lines"
+DATA "        m += len(lines)"
+DATA ""
+DATA "    output += lines[0:n-m]"
+DATA ""
+DATA "    lorem = '\\n'.join(output).rstrip()"
+DATA "    return lorem"
+DATA ""
+DATA ""
+DATA "def get_words(lorem, n):"
+DATA "    \"\"\"Get n words\"\"\""
+DATA "    lorem = no_linebreaks(lorem).rstrip()"
+DATA "    words = lorem.split(' ')"
+DATA "    m = 0"
+DATA "    output = list()"
+DATA ""
+DATA "    while (m < n) and ((n-m) > len(words)):"
+DATA "        output += words"
+DATA "        m += len(words)"
+DATA ""
+DATA "    output += words[0:n-m]"
+DATA "    return ' '.join(output)"
+DATA ""
+DATA ""
+DATA "def get_chars(lorem, n):"
+DATA "    \"\"\"Get n chars.\"\"\""
+DATA "    lorem = no_linebreaks(lorem).rstrip() + ' '"
+DATA "    m = 0"
+DATA "    output = ''"
+DATA ""
+DATA "    while (m < n) and ((n-m) > len(lorem)):"
+DATA "        output += lorem"
+DATA "        m += len(lorem)"
+DATA ""
+DATA "    output += lorem[0:n-m]"
+DATA "    return output"
+DATA ""
+DATA ""
+DATA "def do_lorem(opt):"
+DATA "    \"\"\"Get the lorem and apply the arguments\"\"\""
+DATA ""
+DATA "    if opt.quote:"
+DATA "        lorem = get_quote(idx=opt.quote)"
+DATA "    else:"
+DATA "        lorem = get_quote(opt.source)"
+DATA ""
+DATA "    for spaces in ['\\n', '    ', '    ', '  ', '  ']:"
+DATA "        lorem = lorem.replace(spaces, ' ')"
+DATA ""
+DATA "    if opt.randomize:"
+DATA "        lorem = randomize(lorem)"
+DATA ""
+DATA "    lorem = fill(lorem, width=opt.cols)"
+DATA ""
+DATA "    if opt.sentences is not None:"
+DATA "        lorem = get_sentences(lorem, opt.sentences)"
+DATA "    elif opt.chars is not None:"
+DATA "        lorem = get_chars(lorem, opt.chars)"
+DATA "    elif opt.words is not None:"
+DATA "        lorem = get_words(lorem, opt.words)"
+DATA "    elif opt.lines is not None:"
+DATA "        lorem = get_lines(lorem, opt.lines)"
+DATA ""
+DATA "    if opt.lines is None and opt.chars is None:"
+DATA "        lorem = fill(lorem, width=opt.cols)"
+DATA ""
+DATA "    return do_case(lorem, opt.case)"
+DATA ""
+DATA ""
+DATA "if __name__ == '__main__':"
+DATA "    my_args = parse_args()"
+DATA "    if my_args.t:"
+DATA "        import doctest"
+DATA "        res = doctest.testmod()"
+DATA "        print \"Tested %s cases, %s failed.\" % (res.attempted, res.failed)"
+DATA "    elif my_args.version:"
+DATA "        print my_args.version"
+DATA "    else:"
+DATA "        print do_lorem(my_args)"
+data ""
+DATA "end_of_lorem_data"
+
 Label Helpdata
 
 data "<html><head><title>Rondel Help</title></head><body><h1>"
-data "          RONDEL"
+data "          RONDEL v0.9"
 data "================="
 data "</h1>"
 data " "
 data "<b>"
 data "By Michel Clasquin-Johnson (clasqm)"
-data "Public Domain software 2014"
+data "MIT-licensed 2014"
 data "</b>"
 data " "
 data "Rondel is a text editor. Nothing special about it, you've used text editors before. But Rondel allows you to insert Markdown formatting codes and to generate HTML files from its own files."
 data " "
-data "Rondel is built on the Trope engine and contains a copy of mkd2html(part of the Discount Markdown package, licensed under a BSD-style License, source included). Version numbers for Rondel track those of the Trope engine."
+data "Rondel is built on the Trope engine and requires a copy of mkd2html (part of the Discount Markdown package, licensed under a BSD-style License,). Version numbers for Rondel track those of the Trope engine."
 data " "
 data "<h2>"
 data "===FILE Menu==="
@@ -5358,13 +6168,13 @@ data "</h2>"
 data " "
 data "Operations that affect files."
 data " "
-data "NEW (or Alt-F)"
+data "NEW (or Alt-N)"
 data "Open a new, empty window." 
 data " "
 data "Note that the Settings in this window will reflect the last settings changes you made in ANY window. You open window A and from there new window B, You change settings in window B, You now change back to window A. and decide to open window C. Window C  will open with the setting changes you made in Window B."
 data " "
 data "OPEN (or Alt-O)"
-data "Open a file. A dialog box appears in which you can choose which file to open. Please note that you can also drop a text file on any new, blank window from the Desktop or any Tracker window.You should not, however, drop more than one file simultaneously. Only one of them will load. If you try to open a HTML file, Rondel will attempt to convert it to Markdown-compatible text using the bundled html2text.py utility (since Version 0.5-2-1). This will ONLY convert to canonical Markdown, not the extensions that Rondel can also handle, and it won't help you with CSS-heavy files. But it's better than nothing."
+data "Open a file. A dialog box appears in which you can choose which file to open. Please note that you can also drop a text file on any new, blank window from the Desktop or any Tracker window.You should not, however, drop more than one file simultaneously. Only one of them will load. If you have a already file open and want to one another, please open a new, empty instance of the program first"
 data " "
 data "Note: Rondel will quite happily open more than one instance of the same file, and you might end up saving different versions over one another."
 data " "
@@ -5385,6 +6195,7 @@ data " "
 data "TRANSFER"
 data "Although Rondel is the greatest text editor ever ;-) there are others. This Function allows you to transfer the file to Pe or StyledEdit and closes the current window. I have other Text Editors and Text-handling utilities in the works. Once these are available and if you have them installed, they will automagically appear in this menu."
 data " "
+
 data "GENERATE HTML"
 data "Create a html file in the same directory as your Markdown file. If an html file with the same name already exists there, it will be overwritten. This command is also available from the MarkDown menu. for this to work, you should have placed the mkd2html utility somewhere in your path. The discount package is stipulated as a dependency for this package, so this should not be an issue."
 data " "
@@ -5435,7 +6246,7 @@ data " "
 data "REPLACE"
 data "A fairly primitive GLOBAL, case-dependent search-and-replace using the text in the Find and Replace input boxes at the bottom of the window. You can also just type your text in there and press ALT-R"
 data " "
-data "Note: I have no plans to implement a proper Replace function in Trope.  Frankly, I don't see the point of competing with the superb replace function in Pe. But it's public domain code: feel free to give it a go."
+data "Note: I have no plans to implement a proper Replace function in Rondel.  Frankly, I don't see the point of competing with the superb replace function in Pe. But it's public domain code: feel free to give it a go."
 data " "
 data "SELECT ALL"
 data "Select all text."

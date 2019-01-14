@@ -23,9 +23,18 @@ sub MakePDF(target$)
 	//htmldoc chokes on the <<doctype>> code
 	dothis$="sed '1d' " + htmlname$ + ">" + tempfile$
 	system(dothis$)
-	if target$ = "pdf"  dothis$ = "htmldoc -t pdf --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
-	if target$ = "ps"  dothis$ = "htmldoc -t ps--webpage -f " + CurrentFile$ + ".ps " + tempfile$
-	if target$ = "epub"  dothis$ = "htmldoc -t epub --webpage -f " + CurrentFile$ + ".epub " + tempfile$
-	system(dothis$)
+	if target$ = "pdf"  then
+		dothis$ = "htmldoc -t pdf --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
+		system(dothis$)
+		system("mimeset -F "+ CurrentFile$ + ".pdf ")
+	elseif target$ = "ps"  
+		dothis$ = "htmldoc -t ps--webpage -f " + CurrentFile$ + ".ps " + tempfile$
+		system(dothis$)
+		system("mimeset -F "+ CurrentFile$ + ".ps ")
+	elseif target$ = "epub"  
+		dothis$ = "htmldoc -t epub --webpage -f " + CurrentFile$ + ".epub " + tempfile$
+		system(dothis$)
+		system("mimeset -F "+ CurrentFile$ + ".epub ")
+	endif
 end sub
 

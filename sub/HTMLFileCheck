@@ -2,8 +2,10 @@ sub HTMLFileCheck(FileToOpen$)
 ######Rondel-specific subroutine#####
 	//check if requested file is a html file 
 	local tempval
-	//system("mimeset -F '" + FileToOpen$ + "'")
-	if (left$(system$("catattr -d BEOS:TYPE '" + FileToOpen$ + "'"), 9)) = "text/html" return 1
-	return 0
+	if (left$(system$("catattr -d BEOS:TYPE '" + FileToOpen$ + "'"), 9)) = "text/html" then
+		return 1
+	else
+		return 0
+	endif
 end sub
 

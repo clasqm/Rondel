@@ -54,8 +54,8 @@ sub RondelMoreMenus()
 	submenu "MarkDown","Generate", "HTML", "", "MenuView"
 	submenu "File","Generate", "HTML", "", "MenuView"
 	submenu "MarkDown", "Generate", "PDF", "", "MenuView"
-	submenu "MarkDown", "Generate", "PostScript", "", "MenuView"
+	submenu "MarkDown", "Generate", "EPUB", "", "MenuView"
 	submenu "File", "Generate", "PDF", "", "MenuView"
-	submenu "File", "Generate", "PostScript", "", "MenuView"
+	submenu "File", "Generate", "EPUB", "", "MenuView"
 end sub
 

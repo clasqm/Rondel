@@ -1,0 +1,16 @@
+sub MakeHtml2text()
+######Trope subroutine#####
+	local html2text$, html2textfile$, streamhandle
+	html2textfile$= "/boot/home/config/non-packaged/bin/html2text4rondel"
+	system("notify --timeout 3 --title " + AppName$ + " \"Generating html2text utility\" &")
+	streamhandle = open(html2textfile$, "w")
+	restore html2textdata
+	do
+		read html2text$
+		if (html2text$ = "end_of_html2text_data") break
+		print #streamhandle, html2text$
+	loop
+	close streamhandle
+	system("chmod +x " + html2textfile$)
+end sub
+

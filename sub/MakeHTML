@@ -6,5 +6,6 @@ sub MakeHTML()
 	end if
 	SaveFileFirst()
 	system("mkd2html '" + CurrentFile$ + "' &")
+	system("mimeset -F '" + CurrentFile$ + ".html'")
 end sub
 

@@ -1,13 +1,20 @@
 sub HTML2text$(FileToOpen$)
 ######Rondel-specific subroutine#####
 	local tempname$, tempval
-	tempname$ = FileToOpen$ + ".txt"
-		tempval = alert "You are trying to open a HTML file. Convert to Markdown?", "Yes", "No","", "warning"
-		if tempval = 1 then
-			system("html2text.py " + FileToOpen$ + " > " +  tempname$)
-			return tempname$
-		else
-			return FileToOpen$
-		end if
+	if instr(FileToOpen$, ".html") or instr(FileToOpen$, ".HTML") then
+		tempname$ = left$(FileToOpen$, len(FileToOpen$) - 4) + "txt"
+	elseif instr(FileToOpen$, ".htm") or instr(FileToOpen$, ".HTM") then
+		tempname$ = left$(FileToOpen$, len(FileToOpen$) - 3) + "txt"
+	else
+		tempname$ = FileToOpen$ + ".txt"
+	endif
+	tempval = alert "You are trying to open a HTML file. Convert to Markdown?", "Yes", "No","", "warning"
+	if tempval = 1 then
+	if not(FileExists("/boot/home/config/non-packaged/bin/html2text4rondel")) MakeHtml2text()
+		system("html2text4rondel " + FileToOpen$ + " > " +  tempname$)
+		return tempname$
+	else
+		return FileToOpen$
+	end if
 end sub
 

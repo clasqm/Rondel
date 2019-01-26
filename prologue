@@ -3,7 +3,7 @@
 // subroutines (i.e. the entire contents of the Trope /sub directory) to be copied
 //or symlinked into its own /sub directory 
 
-//Rondel v0.9.4.2
+//Rondel v0.9.5.2
 //Versioning: the first set of numbers refer to the major version of Trope on which this program is built.
 //The second number refers to Rondel-specific changes
 //The third number refers to updates of the included Markdown utility
@@ -12,7 +12,7 @@
 //Previously Public Domain Software 2014
 
 // set DEBUG = 1 to print out all messages on the console
-DEBUG = 1
+DEBUG = 0
 
 import libclasqm_main
 
@@ -45,7 +45,7 @@ Saved$ = "unsaved"
 
 //But these are for real
 AppName$ = "Rondel" 
-AppVersion$ = "v0.9.9.4"
+AppVersion$ = "v0.9.5.2"
 SettingsDir$ = "/boot/home/config/settings/" + AppName$ + "/"
 SettingsFile$ = SettingsDir$ + AppName$ + ".settings"
 RecentFile$ = SettingsDir$ + AppName$ + ".recent"

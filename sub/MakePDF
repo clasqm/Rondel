@@ -3,7 +3,7 @@ sub MakePDF(target$)
 ///Not ready for release
 ///The problem is in htmldoc, not here
 ///it generates files, all right, but they are unreadable.
-	local tempfile$, dothis$, htmlname$, arrsize, a$(1)
+	local tempfile$, dothis$, htmlname$, arrsize, a$(1), notifytext$
 	tempfile$ = TempDir$() + "/temp_rondel.html"
 	arrsize = token(CurrentFile$,a$(), ".")
 	//normal name + 1 extension
@@ -24,14 +24,20 @@ sub MakePDF(target$)
 	dothis$="sed '1d' " + htmlname$ + ">" + tempfile$
 	system(dothis$)
 	if target$ = "pdf"  then
+		notifytext$ = " \"Converting HTML to " + CurrentFile$ + ".pdf\""  //don't lose that initial space
+		system("notify --timeout 3 --title " + AppName$ + notifytext$ + " &")
 		dothis$ = "htmldoc -t pdf --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
 		system(dothis$)
 		system("mimeset -F "+ CurrentFile$ + ".pdf ")
 	elseif target$ = "ps"  
+		notifytext$ = " \"Converting HTML to " + CurrentFile$ + ".ps\""  //don't lose that initial space
+		system("notify --timeout 3 --title " + AppName$ + notifytext$ + " &")
 		dothis$ = "htmldoc -t ps--webpage -f " + CurrentFile$ + ".ps " + tempfile$
 		system(dothis$)
 		system("mimeset -F "+ CurrentFile$ + ".ps ")
-	elseif target$ = "epub"  
+	elseif target$ = "epub"
+		notifytext$ = " \"Converting HTML to " + CurrentFile$ + ".epub\""  //don't lose that initial space
+		system("notify --timeout 3 --title " + AppName$ + notifytext$ + " &")  
 		dothis$ = "htmldoc -t epub --webpage -f " + CurrentFile$ + ".epub " + tempfile$
 		system(dothis$)
 		system("mimeset -F "+ CurrentFile$ + ".epub ")

@@ -3,7 +3,7 @@
 // subroutines (i.e. the entire contents of the Trope /sub directory) to be copied
 //or symlinked into its own /sub directory 
 
-//Rondel v0.9.4.2
+//Rondel v0.9.5.2
 //Versioning: the first set of numbers refer to the major version of Trope on which this program is built.
 //The second number refers to Rondel-specific changes
 //The third number refers to updates of the included Markdown utility
@@ -12,7 +12,7 @@
 //Previously Public Domain Software 2014
 
 // set DEBUG = 1 to print out all messages on the console
-DEBUG = 1
+DEBUG = 0
 
 import libclasqm_main
 
@@ -45,7 +45,7 @@ Saved$ = "unsaved"
 
 //But these are for real
 AppName$ = "Rondel" 
-AppVersion$ = "v0.9.9.4"
+AppVersion$ = "v0.9.5.2"
 SettingsDir$ = "/boot/home/config/settings/" + AppName$ + "/"
 SettingsFile$ = SettingsDir$ + AppName$ + ".settings"
 RecentFile$ = SettingsDir$ + AppName$ + ".recent"
@@ -1069,11 +1069,14 @@ end sub
 
 sub MakeHTML()
 ######Rondel-specific subroutine#####
+	local notifytext$
 	if CurrentFile$ = "" then 
 		alert "Nothing on disk to generate! Have you saved this file?", "OK", "warning"
 		return
 	end if
 	SaveFileFirst()
+	notifytext$ = " \"Converting to " + CurrentFile$ + ".html\""  //don't lose that initial space
+	system("notify --timeout 3 --title " + AppName$ + notifytext$ + " &")
 	system("mkd2html '" + CurrentFile$ + "' &")
 	system("mimeset -F '" + CurrentFile$ + ".html'")
 end sub
@@ -1324,7 +1327,7 @@ sub MakePDF(target$)
 ///Not ready for release
 ///The problem is in htmldoc, not here
 ///it generates files, all right, but they are unreadable.
-	local tempfile$, dothis$, htmlname$, arrsize, a$(1)
+	local tempfile$, dothis$, htmlname$, arrsize, a$(1), notifytext$
 	tempfile$ = TempDir$() + "/temp_rondel.html"
 	arrsize = token(CurrentFile$,a$(), ".")
 	//normal name + 1 extension
@@ -1345,14 +1348,20 @@ sub MakePDF(target$)
 	dothis$="sed '1d' " + htmlname$ + ">" + tempfile$
 	system(dothis$)
 	if target$ = "pdf"  then
+		notifytext$ = " \"Converting HTML to " + CurrentFile$ + ".pdf\""  //don't lose that initial space
+		system("notify --timeout 3 --title " + AppName$ + notifytext$ + " &")
 		dothis$ = "htmldoc -t pdf --webpage -f " + CurrentFile$ + ".pdf " + tempfile$
 		system(dothis$)
 		system("mimeset -F "+ CurrentFile$ + ".pdf ")
 	elseif target$ = "ps"  
+		notifytext$ = " \"Converting HTML to " + CurrentFile$ + ".ps\""  //don't lose that initial space
+		system("notify --timeout 3 --title " + AppName$ + notifytext$ + " &")
 		dothis$ = "htmldoc -t ps--webpage -f " + CurrentFile$ + ".ps " + tempfile$
 		system(dothis$)
 		system("mimeset -F "+ CurrentFile$ + ".ps ")
-	elseif target$ = "epub"  
+	elseif target$ = "epub"
+		notifytext$ = " \"Converting HTML to " + CurrentFile$ + ".epub\""  //don't lose that initial space
+		system("notify --timeout 3 --title " + AppName$ + notifytext$ + " &")  
 		dothis$ = "htmldoc -t epub --webpage -f " + CurrentFile$ + ".epub " + tempfile$
 		system(dothis$)
 		system("mimeset -F "+ CurrentFile$ + ".epub ")
@@ -2639,7 +2648,7 @@ sub TropeHelpLoop(Command$)
 			InstallLanguagePack("pack3")
 			break
 		case "MenuView:Help:About":
-			about$ = AppName$ + " " + AppVersion$ + "\nby Michel Clasquin-Johnson\nMIT-Licensed Software, 2019\n\nWith thanks to Lelldorin for his help on the Find function, and to Rene Gollent, bbjimmy and Humdinger for help with identifying file types.\n\nThis product includes:\n\nToolbar icons from\nhttp://hongkiat.com/blog/toolbar-icon-set/.\n\nThe Lorem utility by Per Erik Strandberg (distributed under the GNU GPL3)."
+			about$ = AppName$ + " " + AppVersion$ + "\nby Michel Clasquin-Johnson\nMIT-Licensed Software, 2019\n\nWith thanks to Lelldorin for his help on the Find function, and to Rene Gollent, bbjimmy and Humdinger for help with identifying file types.\n\nThis product includes:\n\nToolbar icons from\nhttp://hongkiat.com/blog/toolbar-icon-set/.\n\nThe lorem utility by Per Erik Strandberg (distributed under the GNU GPL3)."
 			if AppName$ ="Rondel" about$ = about$ + "\n\nThe html2text utility by Aaron Swartz (distributed under the GNU GPL3)."
 			Alert about$,"OK","info"
 			break

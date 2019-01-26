@@ -1,10 +1,13 @@
 sub MakeHTML()
 ######Rondel-specific subroutine#####
+	local notifytext$
 	if CurrentFile$ = "" then 
 		alert "Nothing on disk to generate! Have you saved this file?", "OK", "warning"
 		return
 	end if
 	SaveFileFirst()
+	notifytext$ = " \"Converting to " + CurrentFile$ + ".html\""  //don't lose that initial space
+	system("notify --timeout 3 --title " + AppName$ + notifytext$ + " &")
 	system("mkd2html '" + CurrentFile$ + "' &")
 	system("mimeset -F '" + CurrentFile$ + ".html'")
 end sub

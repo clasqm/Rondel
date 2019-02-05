@@ -25,4 +25,4 @@ MIT -LIcensed software.
 * htmldoc
 
 
-To compile in Yabadabbadoo, the file "mainloop" and the contents of the entire "sub" directory from [Trope](https://github.com/clasqm/Rondel) must be copied or symlinked within Rondel's directory. These files will not normally appear in the Rondel github repository.
+To compile in Yabadabbadoo, the file "mainloop" and the contents of the entire "sub" directory from [Trope](https://github.com/clasqm/Trope2) must be copied or symlinked within Rondel's directory. These files will not normally appear in the Rondel github repository.

@@ -1,1 +1,3 @@
-/boot/home/git/Trope/mainloop
+replace this file with a symlink to Trope's mainloop when working on Rondel.
+
+This bit of fluff is necessary because Github refuses to build when the link is present

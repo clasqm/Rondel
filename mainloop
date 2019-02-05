@@ -1,3 +1,5 @@
 replace this file with a symlink to Trope's mainloop when working on Rondel.
 
-This bit of fluff is necessary because Github refuses to build when the link is present
+Also link all files in Trope's sub directory to to Rondel's subdirectory 
+
+This bit of fluff is necessary because Github refuses to build when the links are present
